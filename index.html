@@ -5,23 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CI360 - Projeto de Teste</title>
 
-  <!-- TAG / SDK CI360 -->
+  <!-- 1) Inicializa o stub do ci360 e define o tenantId -->
   <script>
     (function(ci, a) {
-      window[ci] || function() {
-        var ef = window[ci] = function() {
-          return ef.q.push(arguments);
-        };
+      window[ci] || (function() {
+        var ef = window[ci] = function() { return ef.q.push(arguments); };
         ef.q = [];
         ef.a = a || {};
-      }();
-    })
-    ('ci360', {
+      })();
+    })('ci360', {
       tenantId: '6b615c4d3c00016d3d12ce8f'
     });
   </script>
 
-  <!-- IMPORTANTE: use o mesmo src que aparece em "SAS Tag Instructions" do seu ambiente -->
+  <!-- 2) Carrega o SDK (use o MESMO src que aparece em SAS Tag Instructions) -->
   <script async
     data-efname="ci360"
     src="https://i-us.ci360.marketing/js/ot2.min.js"
@@ -30,50 +27,53 @@
 
   <style>
     body { font-family: Arial, Helvetica, sans-serif; padding: 32px; line-height: 1.4; }
-    .card { max-width: 820px; border: 1px solid #ddd; border-radius: 12px; padding: 18px 18px 8px; }
+    .card { max-width: 880px; border: 1px solid #ddd; border-radius: 12px; padding: 18px 18px 8px; }
     h1 { margin: 0 0 8px; font-size: 24px; }
     p { margin: 10px 0; }
     button { padding: 10px 14px; font-size: 15px; border-radius: 10px; border: 1px solid #333; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
-    button[disabled] { opacity: 0.5; cursor: not-allowed; }
     code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
     .muted { color: #666; font-size: 13px; }
-    .ok { color: #0b7a2a; font-weight: 600; }
-    .warn { color: #a65a00; font-weight: 600; }
-    .log { background: #0b1020; color: #d6e1ff; padding: 12px; border-radius: 12px; min-height: 110px; white-space: pre-wrap; }
+    .ok { color: #0b8f2f; font-weight: 700; }
+    .bad { color: #b00020; font-weight: 700; }
+    .log { background: #0b1020; color: #d6e1ff; padding: 12px; border-radius: 12px; min-height: 120px; white-space: pre-wrap; }
+    .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
   </style>
 </head>
 
 <body>
   <div class="card">
     <h1>CI360 – Projeto simples de teste</h1>
+
     <p>
-      Use este arquivo para validar rapidamente a <b>Tag/SDK do CI360</b>.
-      Abra este HTML no navegador e clique nos botões abaixo.
+      Use esta página para validar rapidamente a <b>Tag/SDK Web do CI360</b>.
+      Abra no navegador e clique nos botões.
     </p>
 
     <p>
       <b>Evento principal:</b> <code>evento_teste_sdk_ci360</code><br/>
-      (Crie/ative um Custom Event no CI360 com <code>API event key</code> igual a esse nome.)
+      (Crie/ative um <b>Custom Event</b> no CI360 com <code>API event key</code> igual a esse nome.)
     </p>
 
-    <div>
-      <button id="btnBasico" onclick="enviarEventoBasico()" disabled>Enviar evento básico</button>
-      <button id="btnAtrib" onclick="enviarEventoComAtributo()" disabled>Enviar evento + atributo</button>
-      <button id="btnTestar" onclick="testarCarregamento()">Testar se SDK carregou</button>
+    <div class="row">
+      <button onclick="enviarEventoBasico()">Enviar evento básico</button>
+      <button onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
+      <button onclick="testarCarregamento()">Testar se SDK carregou</button>
+      <span id="status" class="bad">Status: aguardando SDK...</span>
     </div>
 
     <p class="muted">
-      Dica: para conferir envio técnico, abra o DevTools (F12) → aba <b>Network</b> e clique no botão.
-      Procure chamadas para <code>ci360</code>/<code>ot2</code>/<code>marketing</code>.
+      Dica: para validar o envio, abra o DevTools (F12) → aba <b>Network</b> e filtre por
+      <code>ci360</code> ou <code>marketing</code>. Você deve ver chamada para
+      <code>https://i-us.ci360.marketing/t/s/...</code> (geralmente status 204/200).
     </p>
 
-    <p><b>Status:</b> <span id="status" class="warn">Aguardando SDK…</span></p>
     <p><b>Log:</b></p>
     <div id="log" class="log"></div>
   </div>
 
   <script>
     const EVENT_NAME = "evento_teste_sdk_ci360";
+    const STATUS_EL = () => document.getElementById("status");
 
     function log(msg) {
       const el = document.getElementById("log");
@@ -81,113 +81,94 @@
       el.textContent = `[${now}] ${msg}\n` + el.textContent;
     }
 
-    function setStatusOk(texto) {
-      const s = document.getElementById("status");
-      s.className = "ok";
-      s.textContent = texto;
-    }
-
-    function setStatusWarn(texto) {
-      const s = document.getElementById("status");
-      s.className = "warn";
-      s.textContent = texto;
-    }
-
-    function habilitarBotoes(habilitar) {
-      document.getElementById("btnBasico").disabled = !habilitar;
-      document.getElementById("btnAtrib").disabled = !habilitar;
-    }
-
-    // Checagem simples e confiável:
-    // - Se window.ci360 existir e for function, dá pra chamar ci360("send", ...)
+    // Verifica se o SDK "de verdade" está pronto (não só o stub)
     function sdkDisponivel() {
+      // stub tem q/a; SDK pronto costuma adicionar métodos internos e processar fila
+      // O mais confiável é: existe função + conseguimos chamar sem erro e ver Network
       return typeof window.ci360 === "function";
     }
 
-    // Espera o SDK ficar pronto (sem “chutar” timing)
-    function esperarSdk(timeoutMs = 8000, intervaloMs = 200) {
-      return new Promise((resolve) => {
-        const start = Date.now();
+    // Espera o SDK carregar (com timeout)
+    function aguardarSdk(timeoutMs = 12000) {
+      const started = Date.now();
+      return new Promise((resolve, reject) => {
         const t = setInterval(() => {
           if (sdkDisponivel()) {
             clearInterval(t);
             resolve(true);
-          } else if (Date.now() - start >= timeoutMs) {
+          } else if (Date.now() - started > timeoutMs) {
             clearInterval(t);
-            resolve(false);
+            reject(new Error("timeout"));
           }
-        }, intervaloMs);
+        }, 200);
       });
     }
 
-    async function inicializar() {
-      log("Página carregada. Aguardando o CI360 (ot2.min.js) inicializar…");
-
-      // Espera até 8s para o SDK ficar disponível
-      const ok = await esperarSdk(8000, 200);
-
-      if (ok) {
-        setStatusOk("SDK carregado ✅ (pronto para enviar eventos)");
-        habilitarBotoes(true);
+    async function testarCarregamento() {
+      try {
+        await aguardarSdk();
+        STATUS_EL().className = "ok";
+        STATUS_EL().textContent = "Status: SDK carregado ✅ (pronto para enviar eventos)";
         log("CI360 disponível: window.ci360 pronto.");
-      } else {
-        setStatusWarn("SDK NÃO carregou (verifique bloqueio/extensão/rede)");
-        habilitarBotoes(false);
-        log("CI360 não ficou disponível em 8s. Verifique: Network → ot2.min.js e bloqueios (adblock/proxy).");
+        alert("SDK carregado. Agora envie um evento e confira o Network.");
+      } catch {
+        STATUS_EL().className = "bad";
+        STATUS_EL().textContent = "Status: SDK NÃO carregou ❌";
+        log("CI360 não carregou dentro do tempo. Confira tenantId e src do ot2.min.js.");
+        alert("SDK não carregou. Veja o log.");
       }
     }
 
-    function testarCarregamento() {
-      if (sdkDisponivel()) {
-        setStatusOk("SDK carregado ✅ (pronto para enviar eventos)");
-        habilitarBotoes(true);
-        log("Teste manual: CI360 disponível (window.ci360 ok).");
-        alert("CI360 carregou. Veja o status/log.");
-      } else {
-        setStatusWarn("Ainda aguardando SDK…");
-        log("Teste manual: CI360 ainda não disponível. Aguarde alguns segundos e tente de novo.");
-        alert("CI360 ainda não carregou. Veja o log.");
-      }
-    }
-
+    // ✅ FORMATO CORRETO de evento (CI360 Web Tag / ot2)
     function enviarEventoBasico() {
       if (!sdkDisponivel()) {
-        log("Não foi possível enviar: CI360 não carregou.");
-        alert("CI360 ainda não carregou. Veja o log.");
+        log("Não foi possível enviar: CI360 ainda não carregou.");
+        alert("CI360 ainda não carregou. Clique em 'Testar se SDK carregou'.");
         return;
       }
 
-      // Envio via JavaScript API
-      ci360("send", "event", {
-        eventName: EVENT_NAME,
-        eventType: "pageAction"
+      // Evento custom (simples)
+      window.ci360('event', {
+        name: EVENT_NAME
       });
 
-      log(`Evento enviado: ${EVENT_NAME} (pageAction)`);
-      alert("Evento enviado para o CI360!");
+      log(`Evento enviado (formato correto): ${EVENT_NAME}`);
+      alert("Evento disparado. Confira o Network por i-us.ci360.marketing/t/s/...");
     }
 
     function enviarEventoComAtributo() {
       if (!sdkDisponivel()) {
-        log("Não foi possível enviar: CI360 não carregou.");
-        alert("CI360 ainda não carregou. Veja o log.");
+        log("Não foi possível enviar: CI360 ainda não carregou.");
+        alert("CI360 ainda não carregou. Clique em 'Testar se SDK carregou'.");
         return;
       }
 
-      const atributo = "clique_botao_com_atributo";
-
-      ci360("send", "event", {
-        eventName: EVENT_NAME,
-        eventType: "pageAction",
-        customName: atributo
+      window.ci360('event', {
+        name: EVENT_NAME,
+        attributes: {
+          customName: "teste_botao",
+          customGroupName: "grupo_teste"
+        }
       });
 
-      log(`Evento enviado: ${EVENT_NAME} + customName="${atributo}"`);
-      alert("Evento + atributo enviado!");
+      log(`Evento enviado c/ atributos: ${EVENT_NAME} (customName/teste_botao)`);
+      alert("Evento + atributos disparado. Confira o Network.");
     }
 
-    // Start
-    inicializar();
+    // Auto-check rápido ao carregar a página
+    (async () => {
+      log("Página carregada. Aguardando CI360 (ot2.min.js) inicializar...");
+      try {
+        await aguardarSdk(8000);
+        STATUS_EL().className = "ok";
+        STATUS_EL().textContent = "Status: SDK carregado ✅ (pronto para enviar eventos)";
+        log("CI360 disponível automaticamente: window.ci360 pronto.");
+      } catch {
+        STATUS_EL().className = "bad";
+        STATUS_EL().textContent = "Status: aguardando SDK...";
+        log("Ainda não detectei o SDK. Se demorar, clique em 'Testar se SDK carregou'.");
+      }
+    })();
   </script>
 </body>
 </html>
