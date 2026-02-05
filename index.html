@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CI360 - Projeto de Teste</title>
+
+  <!-- TAG / SDK CI360 -->
+  <script>
+    (function(ci, a) {
+      window[ci] || function() {
+        var ef = window[ci] = function() {
+          return ef.q.push(arguments);
+        };
+        ef.q = [];
+        ef.a = a || {};
+      }();
+    })
+    ('ci360', {
+      tenantId: '6b615c4d3c00016d3d12ce8f'
+    });
+  </script>
+
+  <!-- IMPORTANTE: use o mesmo src que aparece em "SAS Tag Instructions" do seu ambiente -->
+  <script async
+    data-efname="ci360"
+    src="https://i-us.ci360.marketing/js/ot2.min.js"
+    id="ob-script-async">
+  </script>
+
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; padding: 32px; line-height: 1.4; }
+    .card { max-width: 820px; border: 1px solid #ddd; border-radius: 12px; padding: 18px 18px 8px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 10px 0; }
+    button { padding: 10px 14px; font-size: 15px; border-radius: 10px; border: 1px solid #333; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
+    button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
+    .muted { color: #666; font-size: 13px; }
+    .ok { color: #0b7a2a; font-weight: 600; }
+    .warn { color: #a65a00; font-weight: 600; }
+    .log { background: #0b1020; color: #d6e1ff; padding: 12px; border-radius: 12px; min-height: 110px; white-space: pre-wrap; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>CI360 – Projeto simples de teste</h1>
+    <p>
+      Use este arquivo para validar rapidamente a <b>Tag/SDK do CI360</b>.
+      Abra este HTML no navegador e clique nos botões abaixo.
+    </p>
+
+    <p>
+      <b>Evento principal:</b> <code>evento_teste_sdk_ci360</code><br/>
+      (Crie/ative um Custom Event no CI360 com <code>API event key</code> igual a esse nome.)
+    </p>
+
+    <div>
+      <button id="btnBasico" onclick="enviarEventoBasico()" disabled>Enviar evento básico</button>
+      <button id="btnAtrib" onclick="enviarEventoComAtributo()" disabled>Enviar evento + atributo</button>
+      <button id="btnTestar" onclick="testarCarregamento()">Testar se SDK carregou</button>
+    </div>
+
+    <p class="muted">
+      Dica: para conferir envio técnico, abra o DevTools (F12) → aba <b>Network</b> e clique no botão.
+      Procure chamadas para <code>ci360</code>/<code>ot2</code>/<code>marketing</code>.
+    </p>
+
+    <p><b>Status:</b> <span id="status" class="warn">Aguardando SDK…</span></p>
+    <p><b>Log:</b></p>
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    const EVENT_NAME = "evento_teste_sdk_ci360";
+
+    function log(msg) {
+      const el = document.getElementById("log");
+      const now = new Date().toLocaleString();
+      el.textContent = `[${now}] ${msg}\n` + el.textContent;
+    }
+
+    function setStatusOk(texto) {
+      const s = document.getElementById("status");
+      s.className = "ok";
+      s.textContent = texto;
+    }
+
+    function setStatusWarn(texto) {
+      const s = document.getElementById("status");
+      s.className = "warn";
+      s.textContent = texto;
+    }
+
+    function habilitarBotoes(habilitar) {
+      document.getElementById("btnBasico").disabled = !habilitar;
+      document.getElementById("btnAtrib").disabled = !habilitar;
+    }
+
+    // Checagem simples e confiável:
+    // - Se window.ci360 existir e for function, dá pra chamar ci360("send", ...)
+    function sdkDisponivel() {
+      return typeof window.ci360 === "function";
+    }
+
+    // Espera o SDK ficar pronto (sem “chutar” timing)
+    function esperarSdk(timeoutMs = 8000, intervaloMs = 200) {
+      return new Promise((resolve) => {
+        const start = Date.now();
+        const t = setInterval(() => {
+          if (sdkDisponivel()) {
+            clearInterval(t);
+            resolve(true);
+          } else if (Date.now() - start >= timeoutMs) {
+            clearInterval(t);
+            resolve(false);
+          }
+        }, intervaloMs);
+      });
+    }
+
+    async function inicializar() {
+      log("Página carregada. Aguardando o CI360 (ot2.min.js) inicializar…");
+
+      // Espera até 8s para o SDK ficar disponível
+      const ok = await esperarSdk(8000, 200);
+
+      if (ok) {
+        setStatusOk("SDK carregado ✅ (pronto para enviar eventos)");
+        habilitarBotoes(true);
+        log("CI360 disponível: window.ci360 pronto.");
+      } else {
+        setStatusWarn("SDK NÃO carregou (verifique bloqueio/extensão/rede)");
+        habilitarBotoes(false);
+        log("CI360 não ficou disponível em 8s. Verifique: Network → ot2.min.js e bloqueios (adblock/proxy).");
+      }
+    }
+
+    function testarCarregamento() {
+      if (sdkDisponivel()) {
+        setStatusOk("SDK carregado ✅ (pronto para enviar eventos)");
+        habilitarBotoes(true);
+        log("Teste manual: CI360 disponível (window.ci360 ok).");
+        alert("CI360 carregou. Veja o status/log.");
+      } else {
+        setStatusWarn("Ainda aguardando SDK…");
+        log("Teste manual: CI360 ainda não disponível. Aguarde alguns segundos e tente de novo.");
+        alert("CI360 ainda não carregou. Veja o log.");
+      }
+    }
+
+    function enviarEventoBasico() {
+      if (!sdkDisponivel()) {
+        log("Não foi possível enviar: CI360 não carregou.");
+        alert("CI360 ainda não carregou. Veja o log.");
+        return;
+      }
+
+      // Envio via JavaScript API
+      ci360("send", "event", {
+        eventName: EVENT_NAME,
+        eventType: "pageAction"
+      });
+
+      log(`Evento enviado: ${EVENT_NAME} (pageAction)`);
+      alert("Evento enviado para o CI360!");
+    }
+
+    function enviarEventoComAtributo() {
+      if (!sdkDisponivel()) {
+        log("Não foi possível enviar: CI360 não carregou.");
+        alert("CI360 ainda não carregou. Veja o log.");
+        return;
+      }
+
+      const atributo = "clique_botao_com_atributo";
+
+      ci360("send", "event", {
+        eventName: EVENT_NAME,
+        eventType: "pageAction",
+        customName: atributo
+      });
+
+      log(`Evento enviado: ${EVENT_NAME} + customName="${atributo}"`);
+      alert("Evento + atributo enviado!");
+    }
+
+    // Start
+    inicializar();
+  </script>
+</body>
+</html>
