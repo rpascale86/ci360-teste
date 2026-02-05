@@ -50,8 +50,9 @@
     </p>
 
     <p>
-      <b>Evento principal:</b> <code>evento_teste_sdk_ci360</code><br/>
-      (Crie/ative um <b>Custom Event</b> no CI360 com <code>API event key</code> igual a esse nome.)
+      <b>Evento principal (API event key no CI360):</b>
+      <code id="eventNameUi"></code><br/>
+      (Esse nome precisa ser <b>idêntico</b> ao <code>API event key</code> do seu Custom Event no CI360.)
     </p>
 
     <div class="row">
@@ -72,7 +73,11 @@
   </div>
 
   <script>
-    const EVENT_NAME = "evento_teste_sdk_ci360";
+    // ✅ IMPORTANTE: tem que bater com o "API event key" do CI360
+    const EVENT_NAME = "teste_sdk_ci360";
+
+    document.getElementById("eventNameUi").textContent = EVENT_NAME;
+
     const STATUS_EL = () => document.getElementById("status");
 
     function log(msg) {
@@ -81,10 +86,8 @@
       el.textContent = `[${now}] ${msg}\n` + el.textContent;
     }
 
-    // Verifica se o SDK "de verdade" está pronto (não só o stub)
+    // Verifica se o SDK está disponível
     function sdkDisponivel() {
-      // stub tem q/a; SDK pronto costuma adicionar métodos internos e processar fila
-      // O mais confiável é: existe função + conseguimos chamar sem erro e ver Network
       return typeof window.ci360 === "function";
     }
 
@@ -119,7 +122,7 @@
       }
     }
 
-    // ✅ FORMATO CORRETO de evento (CI360 Web Tag / ot2)
+    // ✅ Envio de Custom Event usando a Web Tag API (ot2)
     function enviarEventoBasico() {
       if (!sdkDisponivel()) {
         log("Não foi possível enviar: CI360 ainda não carregou.");
@@ -127,12 +130,12 @@
         return;
       }
 
-      // Evento custom (simples)
-      window.ci360('event', {
+      // Evento custom simples
+      window.ci360("event", {
         name: EVENT_NAME
       });
 
-      log(`Evento enviado (formato correto): ${EVENT_NAME}`);
+      log(`Evento enviado: ${EVENT_NAME}`);
       alert("Evento disparado. Confira o Network por i-us.ci360.marketing/t/s/...");
     }
 
@@ -143,7 +146,7 @@
         return;
       }
 
-      window.ci360('event', {
+      window.ci360("event", {
         name: EVENT_NAME,
         attributes: {
           customName: "teste_botao",
@@ -151,11 +154,11 @@
         }
       });
 
-      log(`Evento enviado c/ atributos: ${EVENT_NAME} (customName/teste_botao)`);
+      log(`Evento enviado c/ atributos: ${EVENT_NAME} (customName=teste_botao)`);
       alert("Evento + atributos disparado. Confira o Network.");
     }
 
-    // Auto-check rápido ao carregar a página
+    // Auto-check ao carregar
     (async () => {
       log("Página carregada. Aguardando CI360 (ot2.min.js) inicializar...");
       try {
