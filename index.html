@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CI360 - Projeto de Teste</title>
 
-  <!-- 1) Inicializa o stub do ci360 e define o tenantId -->
+  <!-- 1) Stub do ci360 + tenantId (mantido) -->
   <script>
     (function(ci, a) {
       window[ci] || (function() {
@@ -18,7 +18,7 @@
     });
   </script>
 
-  <!-- 2) Carrega o SDK (use o MESMO src que aparece em SAS Tag Instructions) -->
+  <!-- 2) OneTag OT2 (mantido) -->
   <script async
     data-efname="ci360"
     src="https://i-us.ci360.marketing/js/ot2.min.js"
@@ -50,22 +50,29 @@
     </p>
 
     <p>
-      <b>Evento principal (API event key no CI360):</b>
+      <b>Evento principal (no CI360):</b>
       <code id="eventNameUi"></code><br/>
-      (Esse nome precisa ser <b>idêntico</b> ao <code>API event key</code> do seu Custom Event no CI360.)
+      <span class="muted">
+        Para OT2 (OneTag), o mais confiável é disparar via <b>Click Event</b> no CI360 apontando para o <b>id</b> do botão.
+      </span>
     </p>
 
     <div class="row">
-      <button onclick="enviarEventoBasico()">Enviar evento básico</button>
-      <button onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
-      <button onclick="testarCarregamento()">Testar se SDK carregou</button>
+      <!-- ✅ IDs FIXOS para o CI360 identificar por Target=id -->
+      <button id="btn-ci360-evento-basico" onclick="enviarEventoBasico()">Enviar evento básico</button>
+      <button id="btn-ci360-evento-atributo" onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
+      <button id="btn-ci360-testar-sdk" onclick="testarCarregamento()">Testar se SDK carregou</button>
+
       <span id="status" class="bad">Status: aguardando SDK...</span>
     </div>
 
     <p class="muted">
-      Dica: para validar o envio, abra o DevTools (F12) → aba <b>Network</b> e filtre por
-      <code>ci360</code> ou <code>marketing</code>. Você deve ver chamada para
-      <code>https://i-us.ci360.marketing/t/s/...</code> (geralmente status 204/200).
+      <b>Como validar:</b> DevTools (F12) → <b>Network</b> → filtre por <code>t/s</code> ou <code>ci360</code>.
+      Após clicar no botão, você deve ver chamada para <code>https://i-us.ci360.marketing/t/s/...</code> (status 204/200).
+      <br/><br/>
+      <b>Configuração recomendada no CI360:</b>
+      <br/>• Evento de Click → Target: <code>id</code> Equals <code>btn-ci360-evento-basico</code>
+      <br/>• (Opcional) outro evento → Target: <code>id</code> Equals <code>btn-ci360-evento-atributo</code>
     </p>
 
     <p><b>Log:</b></p>
@@ -73,9 +80,9 @@
   </div>
 
   <script>
-    // ✅ IMPORTANTE: tem que bater com o "API event key" do CI360
+    // Mantém esse nome como referência do que você quer rastrear no CI360
+    // (no Click Event você pode usar o mesmo nome "teste_sdk_ci360" ou outro)
     const EVENT_NAME = "teste_sdk_ci360";
-
     document.getElementById("eventNameUi").textContent = EVENT_NAME;
 
     const STATUS_EL = () => document.getElementById("status");
@@ -86,12 +93,12 @@
       el.textContent = `[${now}] ${msg}\n` + el.textContent;
     }
 
-    // Verifica se o SDK está disponível
+    // Aqui a gente só verifica se existe o stub/queue e se o script carregou.
+    // No OT2, "ter ci360 function" não garante que o command "event" vai gerar /t/s
     function sdkDisponivel() {
       return typeof window.ci360 === "function";
     }
 
-    // Espera o SDK carregar (com timeout)
     function aguardarSdk(timeoutMs = 12000) {
       const started = Date.now();
       return new Promise((resolve, reject) => {
@@ -111,9 +118,9 @@
       try {
         await aguardarSdk();
         STATUS_EL().className = "ok";
-        STATUS_EL().textContent = "Status: SDK carregado ✅ (pronto para enviar eventos)";
-        log("CI360 disponível: window.ci360 pronto.");
-        alert("SDK carregado. Agora envie um evento e confira o Network.");
+        STATUS_EL().textContent = "Status: SDK carregado ✅ (clique nos botões para gerar evento de Click)";
+        log("CI360 disponível (stub/queue): window.ci360 pronto. Agora valide pelo Click Event no CI360.");
+        alert("SDK carregado. Agora clique nos botões e confira o Network (t/s).");
       } catch {
         STATUS_EL().className = "bad";
         STATUS_EL().textContent = "Status: SDK NÃO carregou ❌";
@@ -122,49 +129,25 @@
       }
     }
 
-    // ✅ Envio de Custom Event usando a Web Tag API (ot2)
+    // ✅ IMPORTANTE:
+    // Para OT2, o evento que vai aparecer no Network virá do EVENTO DE CLICK configurado no CI360.
+    // Mesmo assim, mantemos logs para ajudar.
     function enviarEventoBasico() {
-      if (!sdkDisponivel()) {
-        log("Não foi possível enviar: CI360 ainda não carregou.");
-        alert("CI360 ainda não carregou. Clique em 'Testar se SDK carregou'.");
-        return;
-      }
-
-      // Evento custom simples
-      window.ci360("event", {
-        name: EVENT_NAME
-      });
-
-      log(`Evento enviado: ${EVENT_NAME}`);
-      alert("Evento disparado. Confira o Network por i-us.ci360.marketing/t/s/...");
+      log(`Clique no botão básico (id=btn-ci360-evento-basico). Se o evento de Click estiver publicado no CI360, deve aparecer /t/s.`);
+      alert("Clique registrado. Agora confira o Network (procure por /t/s).");
     }
 
     function enviarEventoComAtributo() {
-      if (!sdkDisponivel()) {
-        log("Não foi possível enviar: CI360 ainda não carregou.");
-        alert("CI360 ainda não carregou. Clique em 'Testar se SDK carregou'.");
-        return;
-      }
-
-      window.ci360("event", {
-        name: EVENT_NAME,
-        attributes: {
-          customName: "teste_botao",
-          customGroupName: "grupo_teste"
-        }
-      });
-
-      log(`Evento enviado c/ atributos: ${EVENT_NAME} (customName=teste_botao)`);
-      alert("Evento + atributos disparado. Confira o Network.");
+      log(`Clique no botão atributo (id=btn-ci360-evento-atributo). Se houver regra de Click no CI360, deve aparecer /t/s.`);
+      alert("Clique registrado. Confira o Network (procure por /t/s).");
     }
 
-    // Auto-check ao carregar
     (async () => {
       log("Página carregada. Aguardando CI360 (ot2.min.js) inicializar...");
       try {
         await aguardarSdk(8000);
         STATUS_EL().className = "ok";
-        STATUS_EL().textContent = "Status: SDK carregado ✅ (pronto para enviar eventos)";
+        STATUS_EL().textContent = "Status: SDK carregado ✅ (clique nos botões para gerar evento de Click)";
         log("CI360 disponível automaticamente: window.ci360 pronto.");
       } catch {
         STATUS_EL().className = "bad";
