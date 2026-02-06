@@ -1,105 +1,308 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>CI360 – Projeto simples de teste</title>
-
-  <!-- CI360 Tag -->
-  <script src="https://tagmanager.ci360.sas.com/utag.js"></script>
-
-  <script>
-    // =========================================
-    // IDENTITY (BEST PRACTICE)
-    // =========================================
-
-    // Em produção viria do login / CRM / cookie
-    window.ci360_identity = "RENAN_TESTE_001";
-
-    function enviarIdentityManual() {
-      window.ci360_identity = "RENAN_TESTE_001";
-
-      console.log("Identity enviada:", window.ci360_identity);
-      log("Identity enviada: " + window.ci360_identity);
-    }
-
-    // =========================================
-    // EVENTO BÁSICO
-    // =========================================
-    function enviarEventoBasico() {
-      if (window.ci360) {
-        ci360.sendEvent("teste_sdk_ci360");
-        log("Evento básico enviado.");
-      } else {
-        log("CI360 ainda não carregou.");
-      }
-    }
-
-    // =========================================
-    // EVENTO COM ATRIBUTO
-    // =========================================
-    function enviarEventoComAtributo() {
-      if (window.ci360) {
-        ci360.sendEvent("teste_sdk_ci360", {
-          produto: "cartao",
-          origem: "teste_manual"
-        });
-        log("Evento + atributo enviado.");
-      } else {
-        log("CI360 ainda não carregou.");
-      }
-    }
-
-    // =========================================
-    // VALIDAÇÃO SDK
-    // =========================================
-    function testarCarregamento() {
-      if (window.ci360) {
-        log("CI360 pronto automaticamente.");
-      } else {
-        log("CI360 não carregado.");
-      }
-    }
-
-    // =========================================
-    // LOG VISUAL
-    // =========================================
-    function log(msg) {
-      const el = document.getElementById("log");
-      const time = new Date().toLocaleString();
-      el.innerHTML = "[" + time + "] " + msg + "<br>" + el.innerHTML;
-    }
-
-    window.onload = function() {
-      log("Página carregada. Aguardando CI360...");
-    };
-  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CI360 - Web Test (OneTag)</title>
 
   <style>
-    body { font-family: Arial; margin: 40px; }
-    button { padding: 10px; margin: 8px; }
-    #log {
-      background:#0b1220;
-      color:#fff;
-      padding:15px;
-      margin-top:20px;
-      border-radius:6px;
-      font-size:13px;
-    }
+    :root { --ok:#0b8f2f; --bad:#b00020; --muted:#666; --bg:#0b1020; --fg:#d6e1ff; }
+    body { font-family: Arial, Helvetica, sans-serif; padding: 32px; line-height: 1.4; }
+    .card { max-width: 1040px; border: 1px solid #ddd; border-radius: 12px; padding: 18px 18px 8px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 10px 0; }
+    button { padding: 10px 14px; font-size: 15px; border-radius: 10px; border: 1px solid #333; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
+    input { padding: 10px 12px; font-size: 14px; border-radius: 10px; border: 1px solid #bbb; min-width: 260px; }
+    code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .log { background: var(--bg); color: var(--fg); padding: 12px; border-radius: 12px; min-height: 170px; white-space: pre-wrap; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#f4f4f4; }
+    .hr { height:1px; background:#eee; margin: 14px 0; }
   </style>
+
+  <script>
+    // ============================================================
+    // SAS CI360 (OneTag / ot2) - "Gold Standard" Test Harness
+    // ============================================================
+
+    // 1) AJUSTE AQUI (obrigatório)
+    const TENANT_ID = "6b615c4d3c00016d3d12ce8f"; // <- o seu tenant id
+    const OT2_SRC   = "https://i-us.ci360.marketing/js/ot2.min.js";
+
+    // 2) Custom Event key (se você quiser testar JS API de evento)
+    const CUSTOM_EVENT_API_KEY = "teste_sdk_ci360";
+
+    // 3) Identity (customer_id)
+    const ID_STORAGE_KEY = "ci360_customer_id";
+    const DEFAULT_CUSTOMER_ID = "RENAN_TESTE_001";
+
+    // ============================================================
+    // A) Stub do ci360 (sempre antes de carregar o ot2)
+    //    IMPORTANTE: stub != SDK real. O "pronto" é quando Bootstrap existe.
+    // ============================================================
+    (function(ci, a) {
+      window[ci] || (function() {
+        var ef = window[ci] = function() { return ef.q.push(arguments); };
+        ef.q = [];
+        ef.a = a || {};
+      })();
+    })("ci360", { tenantId: TENANT_ID });
+
+    // ============================================================
+    // B) Identity variables (máxima compatibilidade)
+    //    - Você configurou no CI360: JavaScript variable = ci360_identity
+    //    - Muitos setups/diagnósticos também leem: cktlg_identity
+    // ============================================================
+    function loadSavedIdentity() {
+      try { return localStorage.getItem(ID_STORAGE_KEY) || ""; } catch(e) { return ""; }
+    }
+    function persistIdentity(val) {
+      try { localStorage.setItem(ID_STORAGE_KEY, val || ""); } catch(e) {}
+    }
+
+    (function initIdentityEarly(){
+      const saved = loadSavedIdentity();
+      window.ci360_identity = saved;    // <- seu User Identification Definition pode ler esta
+      window.cktlg_identity = saved;    // <- compatibilidade / best practice comum em CI360
+    })();
+
+    // ============================================================
+    // C) Carregar ot2 (OneTag)
+    // ============================================================
+    (function loadOt2(){
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = OT2_SRC;
+      s.setAttribute("data-efname", "ci360");
+      s.id = "ci360-ot2";
+      document.head.appendChild(s);
+    })();
+
+    // ============================================================
+    // D) Helpers de readiness + envio
+    // ============================================================
+    function isSdkRealReady() {
+      // Stub existe sempre. SDK real pronto quando Bootstrap existe.
+      return typeof window.ci360 === "function" && !!window.ci360.Bootstrap;
+    }
+
+    function waitForSdkReady(timeoutMs = 15000) {
+      const start = Date.now();
+      return new Promise((resolve, reject) => {
+        const t = setInterval(() => {
+          if (isSdkRealReady()) { clearInterval(t); resolve(true); }
+          else if (Date.now() - start > timeoutMs) { clearInterval(t); reject(new Error("timeout")); }
+        }, 200);
+      });
+    }
+
+    // Envia um beacon simples via JS API (para "forçar captura" após identity)
+    function sendJsApiEvent(eventKey, attributes) {
+      if (!isSdkRealReady()) return false;
+      window.ci360("event", {
+        name: eventKey,
+        attributes: attributes || undefined
+      });
+      return true;
+    }
+
+    // Define identity e dispara beacon logo após (best practice para validação)
+    async function setIdentityAndFlush(customerId) {
+      const v = (customerId || "").trim();
+      persistIdentity(v);
+
+      // mantém as 2 variáveis (best practice)
+      window.ci360_identity = v;
+      window.cktlg_identity = v;
+
+      // garante que o SDK esteja pronto (se já estiver, segue)
+      try { await waitForSdkReady(12000); } catch(e) {}
+
+      // força um beacon para capturar a identity imediatamente
+      // (se você estiver usando click event também, ótimo. Aqui é para validação.)
+      sendJsApiEvent(CUSTOM_EVENT_API_KEY, { identity_set: "true" });
+    }
+  </script>
 </head>
 
 <body>
+  <div class="card">
+    <h1>CI360 – Web Test (OneTag / OT2)</h1>
 
-  <h2>CI360 – Projeto simples de teste</h2>
+    <p class="muted">
+      Este teste valida <b>Behavioral Events</b> (Click/Custom/Identity) via OneTag.
+      Para <b>Web Analytics</b> (Visits/Content/Page Views), use os relatórios de Content/Visits — são pipelines diferentes.
+    </p>
 
-  <p><b>Evento principal:</b> teste_sdk_ci360</p>
+    <div class="hr"></div>
 
-  <button onclick="enviarEventoBasico()">Enviar evento básico</button>
-  <button onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
-  <button onclick="enviarIdentityManual()">Enviar identity (teste)</button>
-  <button onclick="testarCarregamento()">Testar se SDK carregou</button>
+    <p>
+      <b>Custom Event (API key) para JS API:</b>
+      <span class="pill"><code id="evKey"></code></span>
+    </p>
 
-  <div id="log"></div>
+    <p>
+      <b>Identity (customer_id):</b>
+      <span class="pill"><code id="identityNow">(vazio)</code></span>
+    </p>
 
+    <div class="row">
+      <input id="identityInput" placeholder="ex: RENAN_TESTE_001" />
+      <button id="btn-set-identity">Set Identity (customer_id)</button>
+      <button id="btn-clear-identity">Limpar Identity</button>
+      <span id="status" class="bad">Status: aguardando SDK…</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <p class="muted">
+      <b>Recomendado (CI360 UI):</b> criar <b>Click Event</b> no CI360 apontando para o <b>id</b> do botão.
+      IDs:
+      <code>btn-ci360-click-basico</code>, <code>btn-ci360-click-atributo</code>, <code>btn-ci360-click-identity</code>.
+    </p>
+
+    <div class="row">
+      <!-- BOTÕES PARA CLICK EVENT (CI360 UI) -->
+      <button id="btn-ci360-click-basico">Click: evento básico</button>
+      <button id="btn-ci360-click-atributo">Click: evento + atributo</button>
+      <button id="btn-ci360-click-identity">Click: identity + flush</button>
+
+      <!-- BOTÕES PARA JS API (DEBUG) -->
+      <button id="btn-jsapi-basico">JS API: enviar evento básico</button>
+      <button id="btn-jsapi-atributo">JS API: enviar evento + atributos</button>
+
+      <button id="btn-testar">Testar SDK</button>
+    </div>
+
+    <p class="muted">
+      <b>Validação no browser:</b> DevTools → Network → filtre por <code>/t/s/</code>.
+      Você deve ver <b>POST</b> para <code>https://i-us.ci360.marketing/t/s/...</code> (status 200/204).<br/>
+      <b>Se não aparecer:</b> desative adblock/antitracking, teste janela normal (não anônima) e permita cookies conforme política do seu ambiente.
+    </p>
+
+    <p><b>Log:</b></p>
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    $("evKey").textContent = CUSTOM_EVENT_API_KEY;
+
+    const logEl = $("log");
+    const statusEl = $("status");
+    const identityNowEl = $("identityNow");
+    const identityInput = $("identityInput");
+
+    function log(msg) {
+      const now = new Date().toLocaleString();
+      logEl.textContent = `[${now}] ${msg}\n` + logEl.textContent;
+    }
+
+    function refreshIdentityUI() {
+      const v = (window.ci360_identity || "").trim();
+      identityNowEl.textContent = v || "(vazio)";
+      if (!identityInput.value) identityInput.value = v || DEFAULT_CUSTOMER_ID;
+    }
+
+    async function updateReadyState() {
+      if (isSdkRealReady()) {
+        statusEl.className = "ok";
+        statusEl.textContent = "Status: SDK carregado ✅ (ci360.Bootstrap OK)";
+      } else {
+        statusEl.className = "bad";
+        statusEl.textContent = "Status: aguardando SDK…";
+      }
+    }
+
+    async function testSdk() {
+      log("Testando se SDK real está pronto (ci360.Bootstrap)...");
+      try {
+        await waitForSdkReady(12000);
+        log("OK: SDK pronto (Bootstrap detectado).");
+      } catch(e) {
+        log("ERRO: timeout aguardando SDK. Verifique bloqueios, tenantId e src do ot2.");
+      }
+      updateReadyState();
+    }
+
+    // -----------------------------
+    // Identity
+    // -----------------------------
+    $("btn-set-identity").addEventListener("click", async () => {
+      const v = (identityInput.value || "").trim() || DEFAULT_CUSTOMER_ID;
+      log(`Setando identity: customer_id=${v}`);
+      await setIdentityAndFlush(v);
+      refreshIdentityUI();
+      log("Identity setada e flush disparado (JS API event) para captura imediata.");
+      alert("Identity enviada (variáveis setadas) e beacon disparado. Verifique /t/s/ no Network e o Snowy.");
+    });
+
+    $("btn-clear-identity").addEventListener("click", async () => {
+      log("Limpando identity...");
+      await setIdentityAndFlush("");
+      refreshIdentityUI();
+      log("Identity limpa. (ci360_identity e cktlg_identity vazias).");
+      alert("Identity limpa. Se quiser, dispare um click/evento novamente.");
+    });
+
+    // -----------------------------
+    // Click buttons (para CI360 UI Click Event)
+    // -----------------------------
+    $("btn-ci360-click-basico").addEventListener("click", () => {
+      log("Click: btn-ci360-click-basico (para Click Event no CI360).");
+      // Não mandamos JS API aqui por padrão — a ideia é validar Click Event do CI360.
+    });
+
+    $("btn-ci360-click-atributo").addEventListener("click", () => {
+      log("Click: btn-ci360-click-atributo (para Click Event no CI360).");
+    });
+
+    $("btn-ci360-click-identity").addEventListener("click", async () => {
+      log("Click: btn-ci360-click-identity (vai setar identity e forçar beacon).");
+      const v = (identityInput.value || "").trim() || DEFAULT_CUSTOMER_ID;
+      await setIdentityAndFlush(v);
+      refreshIdentityUI();
+      log("Identity setada e flush disparado após click.");
+    });
+
+    // -----------------------------
+    // JS API (debug)
+    // -----------------------------
+    $("btn-jsapi-basico").addEventListener("click", async () => {
+      await testSdk();
+      const ok = sendJsApiEvent(CUSTOM_EVENT_API_KEY);
+      log(ok ? `JS API: evento enviado (${CUSTOM_EVENT_API_KEY}).` : "JS API: SDK não estava pronto, não enviei.");
+    });
+
+    $("btn-jsapi-atributo").addEventListener("click", async () => {
+      await testSdk();
+      const ok = sendJsApiEvent(CUSTOM_EVENT_API_KEY, {
+        customName: "teste_botao",
+        customGroupName: "grupo_teste"
+      });
+      log(ok ? "JS API: evento + atributos enviado." : "JS API: SDK não estava pronto, não enviei.");
+    });
+
+    $("btn-testar").addEventListener("click", testSdk);
+
+    // -----------------------------
+    // Auto init
+    // -----------------------------
+    (async () => {
+      refreshIdentityUI();
+      log("Página carregada. Aguardando CI360 (ot2.min.js)...");
+      try {
+        await waitForSdkReady(12000);
+        log("SDK pronto automaticamente.");
+      } catch(e) {
+        log("Ainda não detectei SDK real (Bootstrap). Se não subir, verifique bloqueios/cookies/tenant/src.");
+      }
+      updateReadyState();
+    })();
+  </script>
 </body>
 </html>
