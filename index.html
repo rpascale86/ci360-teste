@@ -1,179 +1,105 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CI360 - Projeto de Teste</title>
+  <meta charset="UTF-8">
+  <title>CI360 – Projeto simples de teste</title>
 
-  <!-- 1) Stub CI360 -->
+  <!-- CI360 Tag -->
+  <script src="https://tagmanager.ci360.sas.com/utag.js"></script>
+
   <script>
-    (function(ci, a) {
-      window[ci] || (function() {
-        var ef = window[ci] = function() { return ef.q.push(arguments); };
-        ef.q = [];
-        ef.a = a || {};
-      })();
-    })('ci360', {
-      tenantId: '6b615c4d3c00016d3d12ce8f'
-    });
-  </script>
+    // =========================================
+    // IDENTITY (BEST PRACTICE)
+    // =========================================
 
-  <!-- 2) SDK oficial -->
-  <script async
-    data-efname="ci360"
-    src="https://i-us.ci360.marketing/js/ot2.min.js"
-    id="ob-script-async">
+    // Em produção viria do login / CRM / cookie
+    window.ci360_identity = "RENAN_TESTE_001";
+
+    function enviarIdentityManual() {
+      window.ci360_identity = "RENAN_TESTE_001";
+
+      console.log("Identity enviada:", window.ci360_identity);
+      log("Identity enviada: " + window.ci360_identity);
+    }
+
+    // =========================================
+    // EVENTO BÁSICO
+    // =========================================
+    function enviarEventoBasico() {
+      if (window.ci360) {
+        ci360.sendEvent("teste_sdk_ci360");
+        log("Evento básico enviado.");
+      } else {
+        log("CI360 ainda não carregou.");
+      }
+    }
+
+    // =========================================
+    // EVENTO COM ATRIBUTO
+    // =========================================
+    function enviarEventoComAtributo() {
+      if (window.ci360) {
+        ci360.sendEvent("teste_sdk_ci360", {
+          produto: "cartao",
+          origem: "teste_manual"
+        });
+        log("Evento + atributo enviado.");
+      } else {
+        log("CI360 ainda não carregou.");
+      }
+    }
+
+    // =========================================
+    // VALIDAÇÃO SDK
+    // =========================================
+    function testarCarregamento() {
+      if (window.ci360) {
+        log("CI360 pronto automaticamente.");
+      } else {
+        log("CI360 não carregado.");
+      }
+    }
+
+    // =========================================
+    // LOG VISUAL
+    // =========================================
+    function log(msg) {
+      const el = document.getElementById("log");
+      const time = new Date().toLocaleString();
+      el.innerHTML = "[" + time + "] " + msg + "<br>" + el.innerHTML;
+    }
+
+    window.onload = function() {
+      log("Página carregada. Aguardando CI360...");
+    };
   </script>
 
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 32px; line-height: 1.4; }
-    .card { max-width: 900px; border: 1px solid #ddd; border-radius: 12px; padding: 18px 18px 8px; }
-    h1 { margin: 0 0 8px; font-size: 24px; }
-    p { margin: 10px 0; }
-    button { padding: 10px 14px; font-size: 15px; border-radius: 10px; border: 1px solid #333; cursor: pointer; margin-right: 10px; margin-bottom: 10px; }
-    code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
-    .muted { color: #666; font-size: 13px; }
-    .ok { color: #0b8f2f; font-weight: 700; }
-    .bad { color: #b00020; font-weight: 700; }
-    .log { background: #0b1020; color: #d6e1ff; padding: 12px; border-radius: 12px; min-height: 140px; white-space: pre-wrap; }
-    .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    body { font-family: Arial; margin: 40px; }
+    button { padding: 10px; margin: 8px; }
+    #log {
+      background:#0b1220;
+      color:#fff;
+      padding:15px;
+      margin-top:20px;
+      border-radius:6px;
+      font-size:13px;
+    }
   </style>
 </head>
 
 <body>
-  <div class="card">
-    <h1>CI360 – Projeto simples de teste</h1>
 
-    <p>
-      Use esta página para validar rapidamente a <b>Tag/SDK Web do CI360</b>.
-    </p>
+  <h2>CI360 – Projeto simples de teste</h2>
 
-    <p>
-      <b>Evento principal (API event key no CI360):</b>
-      <code id="eventNameUi"></code>
-    </p>
+  <p><b>Evento principal:</b> teste_sdk_ci360</p>
 
-    <div class="row">
-      <button id="btn-ci360-evento-basico" onclick="enviarEventoBasico()">Enviar evento básico</button>
-      <button id="btn-ci360-evento-atributo" onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
-      <button onclick="enviarIdentityTeste()">Enviar identity (teste)</button>
-      <button onclick="testarCarregamento()">Testar se SDK carregou</button>
-      <span id="status" class="bad">Status: aguardando SDK...</span>
-    </div>
+  <button onclick="enviarEventoBasico()">Enviar evento básico</button>
+  <button onclick="enviarEventoComAtributo()">Enviar evento + atributo</button>
+  <button onclick="enviarIdentityManual()">Enviar identity (teste)</button>
+  <button onclick="testarCarregamento()">Testar se SDK carregou</button>
 
-    <p class="muted">
-      Validação: DevTools → Network → filtrar por <code>/t/s/</code>.
-    </p>
+  <div id="log"></div>
 
-    <p><b>Log:</b></p>
-    <div id="log" class="log"></div>
-  </div>
-
-  <script>
-
-    // 🔹 EVENTO configurado no CI360
-    const EVENT_NAME = "teste_sdk_ci360";
-
-    document.getElementById("eventNameUi").textContent = EVENT_NAME;
-
-    const STATUS_EL = () => document.getElementById("status");
-
-    function log(msg) {
-      const el = document.getElementById("log");
-      const now = new Date().toLocaleString();
-      el.textContent = `[${now}] ${msg}\n` + el.textContent;
-    }
-
-    function sdkDisponivel() {
-      return typeof window.ci360 === "function";
-    }
-
-    function aguardarSdk(timeoutMs = 10000) {
-      const started = Date.now();
-      return new Promise((resolve, reject) => {
-        const t = setInterval(() => {
-          if (sdkDisponivel()) {
-            clearInterval(t);
-            resolve(true);
-          } else if (Date.now() - started > timeoutMs) {
-            clearInterval(t);
-            reject();
-          }
-        }, 200);
-      });
-    }
-
-    async function testarCarregamento() {
-      try {
-        await aguardarSdk();
-        STATUS_EL().className = "ok";
-        STATUS_EL().textContent = "Status: SDK carregado ✅";
-        log("CI360 disponível.");
-      } catch {
-        STATUS_EL().className = "bad";
-        STATUS_EL().textContent = "SDK NÃO carregou ❌";
-        log("SDK não carregou.");
-      }
-    }
-
-    // 🔹 EVENTO SIMPLES
-    function enviarEventoBasico() {
-      if (!sdkDisponivel()) return alert("SDK não carregado");
-
-      window.ci360("event", {
-        name: EVENT_NAME
-      });
-
-      log("Evento básico enviado.");
-    }
-
-    // 🔹 EVENTO COM ATRIBUTOS
-    function enviarEventoComAtributo() {
-      if (!sdkDisponivel()) return alert("SDK não carregado");
-
-      window.ci360("event", {
-        name: EVENT_NAME,
-        attributes: {
-          customName: "teste_botao",
-          customGroupName: "grupo_teste"
-        }
-      });
-
-      log("Evento com atributos enviado.");
-    }
-
-    // 🔹 IDENTITY (novo visitante CI360)
-    function enviarIdentityTeste() {
-      if (!sdkDisponivel()) return alert("SDK não carregado");
-
-      const TEST_ID = "RENAN_TESTE_001";
-
-      window.ci360("identity", {
-        type: "customer_id",
-        value: TEST_ID
-      });
-
-      log(`Identity enviada: ${TEST_ID}`);
-
-      // dispara evento logo depois
-      window.ci360("event", { name: EVENT_NAME });
-
-      log("Evento enviado após identity.");
-    }
-
-    // 🔹 Auto-check
-    (async () => {
-      log("Página carregada. Aguardando CI360...");
-      try {
-        await aguardarSdk(8000);
-        STATUS_EL().className = "ok";
-        STATUS_EL().textContent = "Status: SDK carregado ✅";
-        log("CI360 pronto automaticamente.");
-      } catch {
-        log("SDK ainda não detectado.");
-      }
-    })();
-
-  </script>
 </body>
 </html>
