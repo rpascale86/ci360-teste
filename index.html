@@ -1,111 +1,149 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>CI360 - Teste Oficial</title>
+  <meta charset="UTF-8" />
+  <title>CI360 – Teste oficial Web Event</title>
 
-  <style>
-    body { font-family: Arial; padding: 30px; }
-    .box { max-width: 700px; border:1px solid #ddd; padding:20px; border-radius:10px; }
-    input { padding:10px; width:260px; }
-    button { padding:10px 14px; margin-top:10px; margin-right:10px; }
-    .log { background:#0b1020; color:#d6e1ff; padding:12px; border-radius:10px; margin-top:15px; }
-    .ok { color:green; font-weight:bold; }
-    .bad { color:red; font-weight:bold; }
-  </style>
-
+  <!-- CI360 STUB (OBRIGATÓRIO VIR ANTES DO SDK) -->
   <script>
-    const TENANT_ID = "6b615c4d3c00016d3d12ce8f";
-    const EVENT_KEY = "teste_sdk_ci360";
-
-    // Stub CI360
     (function(ci,a){
       window[ci]||(function(){
         var ef=window[ci]=function(){return ef.q.push(arguments)};
         ef.q=[];ef.a=a||{}
       })()
-    })("ci360",{tenantId:TENANT_ID});
-
-    // OT2
-    (function(){
-      var s=document.createElement("script");
-      s.async=true;
-      s.src="https://i-us.ci360.marketing/js/ot2.min.js";
-      document.head.appendChild(s);
-    })();
-
-    // Identity vars
-    function setIdentity(id){
-      window.ci360_identity=id;
-      window.cktlg_identity=id;
-      localStorage.setItem("ci360_customer_id",id);
-    }
-
-    function sendEvent(){
-      ci360("event",{name:EVENT_KEY});
-    }
+    })("ci360",{ tenantId:"6b615c4d3c00016d3d12ce8f" });
   </script>
-</head>
 
+  <!-- SDK OFICIAL -->
+  <script async src="https://i-us.ci360.marketing/js/ot2.min.js"></script>
+
+  <style>
+    body{
+      font-family:Arial;
+      background:#f5f6fa;
+      padding:40px;
+    }
+
+    .card{
+      background:#fff;
+      padding:25px;
+      border-radius:8px;
+      width:520px;
+      box-shadow:0 2px 6px rgba(0,0,0,.1);
+    }
+
+    input{
+      width:100%;
+      padding:10px;
+      margin-top:10px;
+      margin-bottom:10px;
+      font-size:16px;
+    }
+
+    button{
+      padding:10px 14px;
+      margin-right:10px;
+      margin-top:5px;
+      cursor:pointer;
+    }
+
+    #status{
+      font-weight:bold;
+      margin-top:10px;
+    }
+
+    #log{
+      margin-top:20px;
+      background:#0b132b;
+      color:#fff;
+      padding:12px;
+      font-family:monospace;
+      height:140px;
+      overflow:auto;
+      border-radius:6px;
+    }
+  </style>
+</head>
 <body>
 
-<div class="box">
+<div class="card">
+  <h2>CI360 – Teste oficial Web Event</h2>
 
-  <h2>CI360 – Teste oficial de Web Event</h2>
+  <b>Identity atual:</b>
+  <div id="identityAtual">nenhuma</div>
 
-  <p>Identity atual: <b id="identityView">(não definida)</b></p>
-
-  <input id="identityInput" placeholder="RENAN_TESTE_001">
+  <input id="identityInput" value="RENAN_TESTE_001" />
 
   <br>
 
-  <button onclick="handleIdentity()">Set Identity</button>
-  <button id="btn-ci360-click">Disparar evento</button>
+  <!-- ORDEM CORRETA -->
+  <button onclick="definirIdentity()">1) Set Identity</button>
+  <button onclick="dispararEvento()">2) Disparar evento</button>
 
-  <p id="status" class="bad">Aguardando SDK...</p>
+  <div id="status">Aguardando SDK...</div>
 
-  <div class="log" id="log"></div>
-
+  <div id="log"></div>
 </div>
 
 <script>
 
-const log = (msg)=>{
-  document.getElementById("log").innerHTML =
-    "["+new Date().toLocaleTimeString()+"] "+msg+"<br>"
-    + document.getElementById("log").innerHTML;
-};
+let sdkReady=false;
 
-function sdkReady(){
-  return typeof window.Sci360 === "object";
-}
-
-function updateStatus(){
-  if(sdkReady()){
-    status.innerHTML="SDK carregado";
-    status.className="ok";
+/* MONITORA SDK */
+function aguardarSDK(){
+  if(window.ci360){
+    sdkReady=true;
+    document.getElementById("status").innerHTML="SDK carregado";
   }else{
-    status.innerHTML="Aguardando SDK...";
-    status.className="bad";
+    setTimeout(aguardarSDK,500);
   }
 }
+aguardarSDK();
 
-function handleIdentity(){
-  const id = identityInput.value || "RENAN_TESTE_001";
-  setIdentity(id);
-  identityView.innerText=id;
-  log("Identity definida: "+id);
 
-  ci360("event",{name:EVENT_KEY}); // flush
+/* LOG */
+function log(msg){
+  const agora=new Date().toLocaleTimeString();
+  document.getElementById("log").innerHTML+="["+agora+"] "+msg+"<br>";
 }
 
-document.getElementById("btn-ci360-click")
-  .addEventListener("click",()=>{
-    log("Click enviado");
-    sendEvent();
+
+/* STEP 1 – DEFINIR IDENTITY */
+function definirIdentity(){
+
+  if(!sdkReady){
+    log("SDK ainda não carregou");
+    return;
+  }
+
+  const id=document.getElementById("identityInput").value;
+
+  window.ci360_identity=id;
+
+  ci360("identify",{
+    customer_id:id
   });
 
-setInterval(updateStatus,800);
+  document.getElementById("identityAtual").innerHTML=id;
+
+  log("Identity definida: "+id);
+}
+
+
+/* STEP 2 – DISPARAR EVENTO */
+function dispararEvento(){
+
+  if(!sdkReady){
+    log("SDK ainda não carregou");
+    return;
+  }
+
+  ci360("send",{
+    event:"teste_sdk_ci360"
+  });
+
+  log("Evento enviado com identity ativa");
+}
 
 </script>
 
