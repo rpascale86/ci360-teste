@@ -1,107 +1,136 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!doctype html>
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>CI360 – Teste Web (Identity + Click)</title>
-
-  <!-- SAS CI360 Tag -->
-  <script src="https://i-us.ci360.marketing/js/ot2.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CI360 — Teste Web (Click + Identity)</title>
 
   <style>
-    body { font-family: Arial; background:#f4f4f4; padding:40px; }
-    .card { background:white; padding:20px; border-radius:8px; width:420px; }
-    input { width:100%; padding:10px; margin-bottom:10px; }
-    button { padding:10px; margin-right:8px; margin-top:8px; }
-    .log { background:#081a33; color:#fff; padding:12px; margin-top:15px; height:150px; overflow:auto; }
-    .ok { color:green; font-weight:bold; }
-    .warn { color:red; font-weight:bold; }
+    body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:720px; padding:24px; }
+    h1 { margin:0 0 8px; font-size:22px; }
+    .muted { color:#566; font-size:13px; margin:0 0 16px; }
+    label { display:block; font-weight:600; margin:14px 0 6px; }
+    input { width:100%; padding:12px; border-radius:10px; border:1px solid #ccd; font-size:14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    button {
+      padding:11px 14px; border-radius:10px; border:1px solid #223;
+      background:#fff; cursor:pointer; font-size:14px;
+    }
+    button.primary { background:#111827; color:#fff; border-color:#111827; }
+    .status { margin-top:12px; font-weight:700; }
+    .ok { color:#0a7a2a; }
+    .warn { color:#b45309; }
+    pre {
+      margin-top:16px; background:#0b1530; color:#dbe7ff;
+      padding:14px; border-radius:12px; height:220px; overflow:auto;
+      font-size:12px;
+    }
+    .pill { display:inline-block; background:#eef2ff; color:#1f2a63; padding:3px 8px; border-radius:999px; font-size:12px; }
+    .help { margin-top:14px; font-size:13px; color:#334; line-height:1.35; }
+    code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
   </style>
+
+  <script>
+    // Identity var precisa existir ANTES do SAS Tag carregar
+    (function initIdentityVar() {
+      const saved = localStorage.getItem("ci360_identity") || "";
+      window.ci360_identity = saved; // nome que você usou no CI360 (JavaScript variable)
+    })();
+  </script>
+
+  <!-- CI360 Tag (stub + SDK) -->
+  <script>
+    (function (ci, a) {
+      window[ci] || (function () {
+        var ef = window[ci] = function () { return ef.q.push(arguments); };
+        ef.q = [];
+        ef.a = a || {};
+      })();
+    })("ci360", { tenantId: "6b615c4d3c00016d3d12ce8f" });
+  </script>
+
+  <script async data-efname="ci360" src="https://i-us.ci360.marketing/js/ot2.min.js" id="ob-script-async"></script>
 </head>
 
 <body>
+  <div class="card">
+    <h1>CI360 — Teste Web (Click + Identity)</h1>
+    <p class="muted">
+      Custom Event key: <span class="pill">teste_sdk_ci360</span> |
+      Identity var: <code>window.ci360_identity</code> (customer_id)
+    </p>
 
-<div class="card">
+    <label>Identity (customer_id)</label>
+    <input id="identityInput" placeholder="ex: RENAN_TESTE_001" />
 
-  <h2>CI360 – Teste Web Oficial</h2>
+    <div class="row">
+      <button class="primary" id="btnSetIdentity">1) Set Identity (recarrega)</button>
+      <button id="btn-ci360-evento-basico">2) Disparar evento (Click)</button>
+      <button id="btnClearIdentity">Limpar identity</button>
+    </div>
 
-  <p>Custom Event API key: <b>teste_sdk_ci360</b></p>
+    <div class="status" id="sdkStatus"></div>
 
-  <label>Identity (customer_id)</label>
-  <input id="identityInput" placeholder="ex: RENAN_TESTE_001">
+    <div class="help">
+      <b>Como validar:</b><br/>
+      1) DevTools → Network → filtre por <code>/t/s/</code>.<br/>
+      2) Clique em <b>1) Set Identity</b> (vai recarregar).<br/>
+      3) Clique em <b>2) Disparar evento</b> e veja o POST (200/204).<br/><br/>
+      <b>CI360 UI:</b> pode ter delay. Para ver imediato, use Network/Snowy.
+    </div>
 
-  <button onclick="setIdentity()">1) Set Identity</button>
-  <button id="btn-ci360-evento" onclick="dispararEvento()">2) Disparar evento (Click)</button>
+    <pre id="log"></pre>
+  </div>
 
-  <p id="status">Status: aguardando SDK...</p>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const logEl = $("log");
+    const sdkStatus = $("sdkStatus");
 
-  <div class="log" id="log"></div>
+    function log(msg) {
+      const ts = new Date().toLocaleString();
+      logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
+    }
 
-</div>
+    function setStatus(text, cls) {
+      sdkStatus.className = "status " + (cls || "");
+      sdkStatus.textContent = text;
+    }
 
-<script>
+    (function () {
+      const current = window.ci360_identity || "";
+      $("identityInput").value = current;
+      log(current ? `Identity atual encontrada: ${current}` : "Identity atual: (nenhuma)");
+    })();
 
-let sdkReady = false
+    (function waitForSDK() {
+      if (typeof window.ci360 === "function") {
+        setStatus("SDK detectado ✅", "ok");
+        log("SDK detectado (window.ci360 disponível).");
+        return;
+      }
+      setStatus("Aguardando SDK...", "warn");
+      setTimeout(waitForSDK, 300);
+    })();
 
-function log(msg){
-  const el = document.getElementById('log')
-  el.innerHTML += "["+new Date().toLocaleTimeString()+"] "+msg+"<br>"
-  el.scrollTop = el.scrollHeight
-}
+    $("btnSetIdentity").addEventListener("click", () => {
+      const v = $("identityInput").value.trim();
+      if (!v) return alert("Informe um customer_id (ex.: RENAN_TESTE_001).");
+      localStorage.setItem("ci360_identity", v);
+      log(`Identity salva: ${v}. Recarregando...`);
+      location.reload();
+    });
 
-function aguardarSDK(){
-  if(window.ci360){
-    sdkReady = true
-    document.getElementById('status').innerHTML = "Status: SDK carregado"
-    document.getElementById('status').className = "ok"
-    log("SDK detectado (window.ci360 disponível)")
-  } else {
-    setTimeout(aguardarSDK, 500)
-  }
-}
+    $("btnClearIdentity").addEventListener("click", () => {
+      localStorage.removeItem("ci360_identity");
+      log("Identity removida. Recarregando...");
+      location.reload();
+    });
 
-aguardarSDK()
-
-/* ===== IDENTITY ===== */
-function setIdentity(){
-
-  if(!sdkReady){
-    log("SDK ainda não carregado")
-    return
-  }
-
-  const val = document.getElementById('identityInput').value
-  if(!val){
-    log("Informe um customer_id")
-    return
-  }
-
-  window.ci360_identity = val
-
-  if(window.ci360 && window.ci360.setUser){
-    window.ci360.setUser({ customer_id: val })
-  }
-
-  log("Identity definida: "+val)
-}
-
-/* ===== EVENTO CLICK ===== */
-function dispararEvento(){
-
-  if(!sdkReady){
-    log("SDK ainda não carregado")
-    return
-  }
-
-  if(!window.ci360_identity){
-    log("Defina identity antes do evento")
-    return
-  }
-
-  log("Click disparado — CI360 deve capturar via Click Event")
-
-}
-
-</script>
-
+    $("btn-ci360-evento-basico").addEventListener("click", () => {
+      log("Click no botão (id=btn-ci360-evento-basico). Confira /t/s/ no Network.");
+    });
+  </script>
 </body>
 </html>
