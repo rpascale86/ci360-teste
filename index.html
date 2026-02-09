@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CI360 — Teste Web (Click + Identity)</title>
+  <title>CI360 — Teste Web (Click + Identity + Email)</title>
 
   <style>
     body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
-    .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:760px; padding:24px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:820px; padding:24px; }
     h1 { margin:0 0 8px; font-size:22px; }
     .muted { color:#566; font-size:13px; margin:0 0 16px; line-height:1.35; }
     label { display:block; font-weight:600; margin:14px 0 6px; }
@@ -19,32 +19,35 @@
     }
     button.primary { background:#111827; color:#fff; border-color:#111827; }
     button.danger { border-color:#b91c1c; color:#b91c1c; }
+    button.good { border-color:#0a7a2a; color:#0a7a2a; }
     .status { margin-top:12px; font-weight:700; }
     .ok { color:#0a7a2a; }
     .warn { color:#b45309; }
     pre {
       margin-top:16px; background:#0b1530; color:#dbe7ff;
-      padding:14px; border-radius:12px; height:240px; overflow:auto;
+      padding:14px; border-radius:12px; height:260px; overflow:auto;
       font-size:12px; white-space:pre-wrap;
     }
     .pill { display:inline-block; background:#eef2ff; color:#1f2a63; padding:3px 8px; border-radius:999px; font-size:12px; }
     .help { margin-top:14px; font-size:13px; color:#334; line-height:1.35; }
     code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
   <!--
     1) Identity JS variable (para "User Identification Definition" no CI360)
        - Precisa existir ANTES do SAS Tag carregar
-       - Você configurou no CI360 como JavaScript variable: ci360_identity
+       - No CI360 você apontou para JavaScript variable: ci360_identity
   -->
   <script>
     (function initIdentityVar(){
       const saved = localStorage.getItem("ci360_identity") || "";
-      window.ci360_identity = saved; // <- usado pela definição de User Identification no CI360
+      window.ci360_identity = saved;
     })();
   </script>
 
-  <!-- 2) Stub + tenantId -->
+  <!-- 2) CI360 stub + tenant -->
   <script>
     (function(ci, a) {
       window[ci] || (function() {
@@ -57,26 +60,41 @@
     });
   </script>
 
-  <!-- 3) SAS CI360 Web Tag / OneTag (ot2) -->
+  <!-- 3) CI360 Web Tag (ot2) -->
   <script async data-efname="ci360" src="https://i-us.ci360.marketing/js/ot2.min.js" id="ob-script-async"></script>
 </head>
 
 <body>
   <div class="card">
-    <h1>CI360 — Teste Web (Click + Identity)</h1>
+    <h1>CI360 — Teste Web (Click + Identity + Email)</h1>
 
     <p class="muted">
-      Custom Event (Click target ID): <span class="pill">btn-ci360-evento-basico</span><br/>
-      Custom Event API key (se você usar JS API depois): <span class="pill" id="apiKeyPill"></span><br/>
-      Identity var (User Identification): <code>window.ci360_identity</code> (customer_id)
+      Click target ID: <span class="pill">btn-ci360-evento-basico</span><br/>
+      Custom Event API key (JS API): <span class="pill" id="apiKeyPill"></span><br/>
+      Identity var (User Identification): <code>window.ci360_identity</code> (customer_id)<br/>
+      <b>Para Journey + Triggered Email:</b> use o botão <b>3) Disparar Custom Event (JS API)</b> (ele envia <code>email_address</code> junto).
     </p>
 
-    <label>Identity (customer_id)</label>
-    <input id="identityInput" placeholder="ex: RENAN_TESTE_001" />
+    <div class="grid">
+      <div>
+        <label>customer_id (Identity)</label>
+        <input id="identityInput" placeholder="ex: teste_01" />
+      </div>
+      <div>
+        <label>email_address (para Triggered Email)</label>
+        <input id="emailInput" placeholder="ex: renan.pascale@gmwit.com.br" />
+      </div>
+    </div>
 
     <div class="row">
       <button class="primary" id="btnSetIdentity">1) Set Identity</button>
+
+      <!-- Click Event -->
       <button id="btn-ci360-evento-basico">2) Disparar evento (Click)</button>
+
+      <!-- Custom Event via JS API (recomendado para Email Journey) -->
+      <button class="good" id="btnFireJsApiEvent">3) Disparar Custom Event (JS API)</button>
+
       <button class="danger" id="btnClearIdentity">Limpar identity</button>
       <button id="btnTestSdk">Testar SDK</button>
     </div>
@@ -84,20 +102,21 @@
     <div class="status" id="sdkStatus"></div>
 
     <div class="help">
-      <b>Ordem recomendada (pra bater com CI360):</b><br/>
-      1) Clique em <b>Set Identity</b> (isso salva no <code>localStorage</code> e faz <code>ci360('identify')</code>).<br/>
-      2) Se o CI360 de vocês usa Page View para “User Identification”, clique em <b>Set Identity</b> e depois <b>recarregue</b> a página (F5) pelo menos 1x.<br/>
-      3) Clique em <b>Disparar evento (Click)</b> e valide no Network (/t/s/).<br/><br/>
-      <b>Validação rápida:</b> DevTools → Network → filtro <code>/t/s/</code> → deve aparecer POST (200/204).<br/>
-      <b>Obs:</b> Reports/Diagnostics no CI360 têm delay (não é realtime). Use Network/Snowy para ver na hora.
+      <b>Fluxo recomendado (melhor prática para validar Journey + Email):</b><br/>
+      1) Preencha <code>customer_id</code> e <code>email_address</code>.<br/>
+      2) Clique em <b>1) Set Identity</b> (salva e envia <code>ci360('identify')</code>).<br/>
+      3) (Opcional) Recarregue (F5) 1x se sua identificação depende do Page View.<br/>
+      4) Clique em <b>3) Disparar Custom Event (JS API)</b> para disparar o evento com <b>email_address</b> (isso destrava o Triggered Email).<br/><br/>
+
+      <b>Validação no browser:</b> DevTools → Network → filtre por <code>/t/s/</code> → veja POST 200/204.<br/>
+      <b>Validação no CI360:</b> use <i>Diagnostics</i> (Identity Map / Customer State) e a aba de eventos no Snowy.
     </div>
 
     <pre id="log"></pre>
   </div>
 
   <script>
-    // Ajuste aqui se quiser exibir o "API event key" do seu Custom Event (para JS API).
-    // Para Click Event (target id), o que importa mesmo é o ID do botão: btn-ci360-evento-basico
+    // >>> Ajuste se necessário
     const CUSTOM_EVENT_API_KEY = "teste_sdk_ci360";
     document.getElementById("apiKeyPill").textContent = CUSTOM_EVENT_API_KEY;
 
@@ -115,14 +134,18 @@
       sdkStatus.textContent = text;
     }
 
-    // Preenche input com identity atual
+    // Preenche inputs com valores atuais
     (function(){
-      const current = window.ci360_identity || "";
-      $("identityInput").value = current;
-      log(current ? `Identity atual encontrada (window.ci360_identity): ${current}` : "Identity atual: (nenhuma)");
+      const currentId = window.ci360_identity || "";
+      $("identityInput").value = currentId;
+      log(currentId ? `Identity atual (window.ci360_identity): ${currentId}` : "Identity atual: (nenhuma)");
+
+      // tenta preencher email salvo (opcional)
+      const savedEmail = localStorage.getItem("ci360_email") || "";
+      if (savedEmail) $("emailInput").value = savedEmail;
     })();
 
-    // Espera SDK carregar com timeout
+    // SDK detection
     function sdkDisponivel() {
       return (typeof window.ci360 === "function");
     }
@@ -151,51 +174,103 @@
 
     // ========= botões =========
 
-    // 1) Set Identity (best practice: JS variable + identify API)
+    // 1) Set Identity
     $("btnSetIdentity").addEventListener("click", async () => {
-      const id = $("identityInput").value.trim();
-      if (!id) {
-        alert("Informe um customer_id (ex.: RENAN_TESTE_001).");
+      const customerId = $("identityInput").value.trim();
+      const email = $("emailInput").value.trim();
+
+      if (!customerId) {
+        alert("Informe um customer_id (ex.: teste_01).");
         return;
       }
 
-      // salva pra Page View / User Identification Definition (JS variable)
-      localStorage.setItem("ci360_identity", id);
-      window.ci360_identity = id;
+      // salva variável para User Identification Definition (Page View)
+      localStorage.setItem("ci360_identity", customerId);
+      window.ci360_identity = customerId;
 
-      log(`Identity salva: ${id} (localStorage + window.ci360_identity).`);
+      if (email) localStorage.setItem("ci360_email", email);
 
-      // envia explicitamente via API (quando disponível)
+      log(`Identity salva: ${customerId} (localStorage + window.ci360_identity).`);
+
+      // envia identify explicitamente (bom para realtime)
       try {
         await aguardarSdk(12000);
-        // Muitos tenants aceitam identify com o "identification type" como chave (customer_id)
-        // Se o seu tenant exigir outro formato, você ajusta só aqui.
-        window.ci360("identify", { customer_id: id });
-        log(`ci360('identify', {customer_id: '${id}'}) enviado.`);
+
+        // Versão mais comum (e compatível com a UI "customer_id")
+        window.ci360("identify", { customer_id: customerId });
+
+        // Se você quiser FORÇAR email como atributo adicional (opcional)
+        // (não substitui email contact do Data Hub, mas ajuda no debug)
+        if (email) {
+          window.ci360("identify", { customer_id: customerId, email_address: email });
+          log(`ci360('identify', {customer_id:'${customerId}', email_address:'${email}'}) enviado (extra).`);
+        } else {
+          log(`ci360('identify', {customer_id:'${customerId}'}) enviado.`);
+        }
+
         setStatus("SDK detectado ✅", "ok");
-      } catch (e) {
+      } catch {
         log("SDK ainda não disponível para enviar identify. Recarregue a página e tente novamente.");
         setStatus("Aguardando SDK...", "warn");
       }
 
-      // DICA prática: para User Identification baseada em Page View,
-      // vale recarregar 1x para garantir que o Page View leve a variável já setada.
-      alert("Identity setada. Se sua definição de User Identification usa Page View, recarregue (F5) 1x e depois clique em 'Disparar evento'.");
+      alert("Identity setada. Agora use o botão 3 (JS API) para disparar evento com email_address e acionar o Triggered Email.");
     });
 
     // Limpar identity
     $("btnClearIdentity").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
+      localStorage.removeItem("ci360_email");
       window.ci360_identity = "";
-      log("Identity removida (localStorage + window.ci360_identity).");
-      alert("Identity removida. Recarregue a página (F5).");
+      log("Identity/email removidos (localStorage + window.ci360_identity).");
+      alert("Identity/email removidos. Recarregue a página (F5).");
     });
 
-    // 2) Disparar evento (Click)
-    // IMPORTANTÍSSIMO: este botão é o alvo do Click Event no CI360 (Target id = btn-ci360-evento-basico)
+    // 2) Click event (target id)
     $("btn-ci360-evento-basico").addEventListener("click", () => {
       log("Click no botão de evento (id=btn-ci360-evento-basico). Valide /t/s/ no Network (200/204).");
-      alert("Evento de CLICK disparado. Abra Network e filtre por /t/s/ para ver o POST.");
+      alert("Evento de CLICK disparado. (Este é útil para validar Click Event no CI360, mas não leva email como atributo.)");
+    });
+
+    // 3) Custom Event via JS API (melhor para Journey + Triggered Email)
+    $("btnFireJsApiEvent").addEventListener("click", async () => {
+      const customerId = $("identityInput").value.trim();
+      const email = $("emailInput").value.trim();
+
+      if (!customerId) {
+        alert("Preencha customer_id antes.");
+        return;
+      }
+      if (!email) {
+        alert("Preencha email_address (isso é o que o Triggered Email precisa).");
+        return;
+      }
+
+      // garanta persistência da identity var também
+      localStorage.setItem("ci360_identity", customerId);
+      window.ci360_identity = customerId;
+      localStorage.setItem("ci360_email", email);
+
+      try {
+        await aguardarSdk(12000);
+
+        // (1) garante identificação
+        window.ci360("identify", { customer_id: customerId });
+
+        // (2) dispara o Custom Event COM ATRIBUTOS
+        // Isso é o que resolve o aviso: "The trigger event has no email attribute"
+        window.ci360("event", CUSTOM_EVENT_API_KEY, {
+          customer_id: customerId,
+          email_address: email,
+          source: "web_test"
+        });
+
+        log(`ci360('event','${CUSTOM_EVENT_API_KEY}', {customer_id:'${customerId}', email_address:'${email}'}) enviado.`);
+        alert("Custom Event (JS API) enviado com email_address. Agora o Journey/Triggered Email tem tudo que precisa.");
+      } catch {
+        log("Falha ao enviar JS API event (SDK indisponível/timeout).");
+        alert("SDK não disponível. Verifique se ot2 carregou e tente novamente.");
+      }
     });
 
     // Testar SDK manual
