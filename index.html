@@ -7,7 +7,7 @@
 
   <style>
     body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
-    .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:820px; padding:24px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:860px; padding:24px; }
     h1 { margin:0 0 8px; font-size:22px; }
     .muted { color:#566; font-size:13px; margin:0 0 16px; line-height:1.35; }
     label { display:block; font-weight:600; margin:14px 0 6px; }
@@ -25,7 +25,7 @@
     .warn { color:#b45309; }
     pre {
       margin-top:16px; background:#0b1530; color:#dbe7ff;
-      padding:14px; border-radius:12px; height:260px; overflow:auto;
+      padding:14px; border-radius:12px; height:280px; overflow:auto;
       font-size:12px; white-space:pre-wrap;
     }
     .pill { display:inline-block; background:#eef2ff; color:#1f2a63; padding:3px 8px; border-radius:999px; font-size:12px; }
@@ -33,12 +33,14 @@
     code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
+    .kvs { margin-top:10px; font-size:12px; color:#223; }
+    .kvs b { font-weight:700; }
   </style>
 
   <!--
     1) Identity JS variable (para "User Identification Definition" no CI360)
        - Precisa existir ANTES do SAS Tag carregar
-       - No CI360 você apontou para JavaScript variable: ci360_identity
+       - No CI360 você aponta para JavaScript variable: ci360_identity
   -->
   <script>
     (function initIdentityVar(){
@@ -47,7 +49,10 @@
     })();
   </script>
 
-  <!-- 2) CI360 stub + tenant -->
+  <!--
+    2) CI360 stub + tenant (MANTIDO NO FORMATO HOMOLOGADO)
+    Observação: o stub sempre existe como function e mantém fila em ci360.q até o runtime assumir.
+  -->
   <script>
     (function(ci, a) {
       window[ci] || (function() {
@@ -60,7 +65,7 @@
     });
   </script>
 
-  <!-- 3) CI360 Web Tag (ot2) -->
+  <!-- 3) CI360 Web Tag (ot2) — MANTIDA (homologada) -->
   <script async data-efname="ci360" src="https://i-us.ci360.marketing/js/ot2.min.js" id="ob-script-async"></script>
 </head>
 
@@ -78,11 +83,11 @@
     <div class="grid">
       <div>
         <label>customer_id (Identity)</label>
-        <input id="identityInput" placeholder="ex: teste_01" />
+        <input id="identityInput" placeholder="ex: teste_01" autocomplete="off" />
       </div>
       <div>
         <label>email_address (para Triggered Email)</label>
-        <input id="emailInput" placeholder="ex: renan.pascale@gmwit.com.br" />
+        <input id="emailInput" placeholder="ex: renan.pascale@gmwit.com.br" autocomplete="off" />
       </div>
     </div>
 
@@ -101,22 +106,23 @@
 
     <div class="status" id="sdkStatus"></div>
 
-    <div class="help">
-      <b>Fluxo recomendado (melhor prática para validar Journey + Email):</b><br/>
-      1) Preencha <code>customer_id</code> e <code>email_address</code>.<br/>
-      2) Clique em <b>1) Set Identity</b> (salva e envia <code>ci360('identify')</code>).<br/>
-      3) (Opcional) Recarregue (F5) 1x se sua identificação depende do Page View.<br/>
-      4) Clique em <b>3) Disparar Custom Event (JS API)</b> para disparar o evento com <b>email_address</b> (isso destrava o Triggered Email).<br/><br/>
+    <div class="kvs" id="diag"></div>
 
-      <b>Validação no browser:</b> DevTools → Network → filtre por <code>/t/s/</code> → veja POST 200/204.<br/>
-      <b>Validação no CI360:</b> use <i>Diagnostics</i> (Identity Map / Customer State) e a aba de eventos no Snowy.
+    <div class="help">
+      <b>Fluxo recomendado:</b><br/>
+      1) Preencha <code>customer_id</code> e <code>email_address</code>.<br/>
+      2) Clique em <b>1) Set Identity</b> (salva <code>ci360_identity</code> e envia <code>identify</code> com runtime ativo).<br/>
+      3) Clique em <b>3) Disparar Custom Event (JS API)</b> (envia <code>email_address</code> + <code>customer_id</code> no evento).<br/><br/>
+
+      <b>Validação no browser:</b> DevTools → Network → filtre por <code>/t/s/</code> → veja requests 200/204 e procure <code>email_address</code> no Payload.<br/>
+      <b>Dica:</b> Se aparecer erro “Not able to perform event/identify”, é porque você chamou o stub (fila). Este index espera o runtime e ainda faz fallback para <code>c1360</code> se o tenant expor o runtime por esse nome.
     </div>
 
     <pre id="log"></pre>
   </div>
 
   <script>
-    // >>> Ajuste se necessário
+    // >>> Ajuste se necessário (precisa bater com o trigger no CI360)
     const CUSTOM_EVENT_API_KEY = "teste_sdk_ci360";
     document.getElementById("apiKeyPill").textContent = CUSTOM_EVENT_API_KEY;
 
@@ -124,14 +130,69 @@
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
     const sdkStatus = $("sdkStatus");
+    const diagEl = $("diag");
 
     function log(msg){
       const ts = new Date().toLocaleString();
       logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
+      try { console.log("[CI360-TEST]", msg); } catch {}
     }
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
+    }
+
+    // Melhor prática: validação mínima de email (client-side só para evitar erro óbvio)
+    function isEmailLike(v) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    }
+
+    // ===== Runtime detection (melhores práticas) =====
+    // Motivo: o stub sempre existe e mantém fila em .q. Só consideramos "pronto" quando NÃO há .q.
+    // Além disso, alguns tenants expõem o runtime como c1360. Mantemos a tag homologada e fazemos "bridge" só no JS.
+    function getCiRuntime() {
+      const ci = window.ci360;
+      const c1 = window.c1360;
+
+      // 1) ci360 runtime já assumiu (sem fila)
+      if (typeof ci === "function" && !ci.q) return ci;
+
+      // 2) runtime exposto como c1360 (sem fila) — cria alias para manter compatível com a sua base
+      if (typeof c1 === "function" && !c1.q) {
+        window.ci360 = c1; // bridge
+        return c1;
+      }
+
+      return null; // ainda está no stub
+    }
+
+    function aguardarRuntime(timeoutMs = 12000) {
+      const started = Date.now();
+      return new Promise((resolve, reject) => {
+        const t = setInterval(() => {
+          const rt = getCiRuntime();
+          if (rt) { clearInterval(t); resolve(rt); }
+          else if (Date.now() - started > timeoutMs) { clearInterval(t); reject(new Error("timeout")); }
+        }, 200);
+      });
+    }
+
+    function renderDiag() {
+      const hasCi = typeof window.ci360 === "function";
+      const hasC1 = typeof window.c1360 === "function";
+      const ciQ = hasCi ? !!window.ci360.q : false;
+      const c1Q = hasC1 ? !!window.c1360.q : false;
+      const rt = getCiRuntime();
+      const rtName =
+        rt === window.ci360 ? "ci360" :
+        rt === window.c1360 ? "c1360" :
+        rt ? "runtime" : "—";
+
+      diagEl.innerHTML =
+        `<b>Diagnóstico:</b> ` +
+        `ci360=${hasCi ? "sim" : "não"} (q=${ciQ ? "sim" : "não"}), ` +
+        `c1360=${hasC1 ? "sim" : "não"} (q=${c1Q ? "sim" : "não"}), ` +
+        `runtime=${rt ? "ok" : "pendente"} (<b>${rtName}</b>)`;
     }
 
     // Preenche inputs com valores atuais
@@ -140,35 +201,24 @@
       $("identityInput").value = currentId;
       log(currentId ? `Identity atual (window.ci360_identity): ${currentId}` : "Identity atual: (nenhuma)");
 
-      // tenta preencher email salvo (opcional)
       const savedEmail = localStorage.getItem("ci360_email") || "";
       if (savedEmail) $("emailInput").value = savedEmail;
-    })();
 
-    // SDK detection
-    function sdkDisponivel() {
-      return (typeof window.ci360 === "function");
-    }
-    function aguardarSdk(timeoutMs = 12000) {
-      const started = Date.now();
-      return new Promise((resolve, reject) => {
-        const t = setInterval(() => {
-          if (sdkDisponivel()) { clearInterval(t); resolve(true); }
-          else if (Date.now() - started > timeoutMs) { clearInterval(t); reject(new Error("timeout")); }
-        }, 200);
-      });
-    }
+      renderDiag();
+    })();
 
     // Auto-check ao carregar
     (async () => {
-      setStatus("Aguardando SDK...", "warn");
+      setStatus("Aguardando runtime do CI360...", "warn");
       try {
-        await aguardarSdk(12000);
-        setStatus("SDK detectado ✅ (window.ci360 disponível)", "ok");
-        log("SDK detectado (window.ci360 disponível).");
+        await aguardarRuntime(12000);
+        setStatus("SDK detectado ✅ (runtime ativo)", "ok");
+        log("Runtime do CI360 ativo. Pode enviar identify/event com segurança.");
       } catch {
-        setStatus("SDK não carregou ❌ (confira tenantId/src do ot2.min.js)", "warn");
-        log("SDK não foi detectado no tempo. Verifique tenantId e URL do ot2.min.js.");
+        setStatus("Runtime não ficou ativo ❌ (timeout). Confira tenantId/src/consent/adblock.", "warn");
+        log("Runtime não ficou ativo no tempo. Pageview pode existir, mas JS API pode falhar se estiver no stub.");
+      } finally {
+        renderDiag();
       }
     })();
 
@@ -183,38 +233,36 @@
         alert("Informe um customer_id (ex.: teste_01).");
         return;
       }
+      if (email && !isEmailLike(email)) {
+        alert("Email parece inválido. Ex.: renan.pascale@gmwit.com.br");
+        return;
+      }
 
-      // salva variável para User Identification Definition (Page View)
+      // Persistência para User Identification Definition (Page View)
       localStorage.setItem("ci360_identity", customerId);
       window.ci360_identity = customerId;
-
       if (email) localStorage.setItem("ci360_email", email);
 
       log(`Identity salva: ${customerId} (localStorage + window.ci360_identity).`);
+      renderDiag();
 
-      // envia identify explicitamente (bom para realtime)
       try {
-        await aguardarSdk(12000);
+        const rt = await aguardarRuntime(12000);
 
-        // Versão mais comum (e compatível com a UI "customer_id")
-        window.ci360("identify", { customer_id: customerId });
+        // Melhor prática: identify só com customer_id
+        rt("identify", { customer_id: customerId });
+        log(`identify enviado: { customer_id: '${customerId}' }`);
 
-        // Se você quiser FORÇAR email como atributo adicional (opcional)
-        // (não substitui email contact do Data Hub, mas ajuda no debug)
-        if (email) {
-          window.ci360("identify", { customer_id: customerId, email_address: email });
-          log(`ci360('identify', {customer_id:'${customerId}', email_address:'${email}'}) enviado (extra).`);
-        } else {
-          log(`ci360('identify', {customer_id:'${customerId}'}) enviado.`);
-        }
+        setStatus("SDK detectado ✅ (runtime ativo)", "ok");
+        renderDiag();
 
-        setStatus("SDK detectado ✅", "ok");
+        alert("Identity setada. Agora use o botão 3 (JS API) para disparar evento com email_address e acionar o Triggered Email.");
       } catch {
-        log("SDK ainda não disponível para enviar identify. Recarregue a página e tente novamente.");
-        setStatus("Aguardando SDK...", "warn");
+        log("Falha: runtime não disponível para enviar identify (timeout).");
+        setStatus("Aguardando runtime do CI360...", "warn");
+        renderDiag();
+        alert("Runtime do CI360 não disponível (timeout). Recarregue e verifique bloqueios (consent/adblock).");
       }
-
-      alert("Identity setada. Agora use o botão 3 (JS API) para disparar evento com email_address e acionar o Triggered Email.");
     });
 
     // Limpar identity
@@ -222,14 +270,18 @@
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
       window.ci360_identity = "";
+      $("identityInput").value = "";
+      $("emailInput").value = "";
       log("Identity/email removidos (localStorage + window.ci360_identity).");
+      renderDiag();
       alert("Identity/email removidos. Recarregue a página (F5).");
     });
 
     // 2) Click event (target id)
     $("btn-ci360-evento-basico").addEventListener("click", () => {
       log("Click no botão de evento (id=btn-ci360-evento-basico). Valide /t/s/ no Network (200/204).");
-      alert("Evento de CLICK disparado. (Este é útil para validar Click Event no CI360, mas não leva email como atributo.)");
+      renderDiag();
+      alert("Evento de CLICK disparado. (Útil para validar Click Event no CI360; não leva email como atributo.)");
     });
 
     // 3) Custom Event via JS API (melhor para Journey + Triggered Email)
@@ -245,47 +297,59 @@
         alert("Preencha email_address (isso é o que o Triggered Email precisa).");
         return;
       }
+      if (!isEmailLike(email)) {
+        alert("Email parece inválido. Ex.: renan.pascale@gmwit.com.br");
+        return;
+      }
 
-      // garanta persistência da identity var também
+      // Persistência (mantém pageview/identity alinhados)
       localStorage.setItem("ci360_identity", customerId);
       window.ci360_identity = customerId;
       localStorage.setItem("ci360_email", email);
 
+      renderDiag();
+
       try {
-        await aguardarSdk(12000);
+        const rt = await aguardarRuntime(12000);
 
         // (1) garante identificação
-        window.ci360("identify", { customer_id: customerId });
+        rt("identify", { customer_id: customerId });
 
-        // (2) dispara o Custom Event COM ATRIBUTOS
-        // Isso é o que resolve o aviso: "The trigger event has no email attribute"
-        window.ci360("event", CUSTOM_EVENT_API_KEY, {
+        // (2) dispara o Custom Event COM ATRIBUTOS (email_address)
+        rt("event", CUSTOM_EVENT_API_KEY, {
           customer_id: customerId,
           email_address: email,
           source: "web_test"
         });
 
-        log(`ci360('event','${CUSTOM_EVENT_API_KEY}', {customer_id:'${customerId}', email_address:'${email}'}) enviado.`);
-        alert("Custom Event (JS API) enviado com email_address. Agora o Journey/Triggered Email tem tudo que precisa.");
-      } catch {
-        log("Falha ao enviar JS API event (SDK indisponível/timeout).");
-        alert("SDK não disponível. Verifique se ot2 carregou e tente novamente.");
+        log(`event enviado: key='${CUSTOM_EVENT_API_KEY}', { customer_id:'${customerId}', email_address:'${email}', source:'web_test' }`);
+        renderDiag();
+        alert("Custom Event (JS API) enviado com email_address. Agora o Journey/Triggered Email tem o atributo necessário.");
+      } catch (e) {
+        log("Falha ao enviar JS API event (runtime indisponível/timeout).");
+        renderDiag();
+        alert("Runtime do CI360 não disponível. Verifique se o OT2 carregou e se não há bloqueio (consent/adblock).");
       }
     });
 
-    // Testar SDK manual
+    // Testar SDK manual (runtime)
     $("btnTestSdk").addEventListener("click", async () => {
       try {
-        await aguardarSdk(8000);
-        setStatus("SDK detectado ✅", "ok");
-        log("Teste SDK: OK.");
-        alert("SDK carregado.");
+        await aguardarRuntime(8000);
+        setStatus("SDK detectado ✅ (runtime ativo)", "ok");
+        renderDiag();
+        log("Teste runtime: OK.");
+        alert("Runtime do CI360 carregado.");
       } catch {
-        setStatus("SDK não carregou ❌", "warn");
-        log("Teste SDK: falhou (timeout).");
-        alert("SDK não carregou. Verifique tenantId e ot2.min.js.");
+        setStatus("Runtime não carregou ❌", "warn");
+        renderDiag();
+        log("Teste runtime: falhou (timeout).");
+        alert("Runtime não carregou. Verifique tenantId, URL do ot2, e bloqueios (consent/adblock).");
       }
     });
+
+    // Atualiza diag periodicamente (útil em casos de carregamento lento)
+    setInterval(renderDiag, 1500);
   </script>
 </body>
 </html>
