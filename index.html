@@ -80,12 +80,12 @@
 
     <div class="grid">
       <div>
-        <label>customer_id (Identity)</label>
-        <input id="identityInput" placeholder="ex: teste_01" />
+        <label for="identityInput">customer_id (Identity)</label>
+        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: teste_01" />
       </div>
       <div>
-        <label>email (para Journey/Triggered Email)</label>
-        <input id="emailInput" placeholder="ex: usuario@empresa.com" />
+        <label for="emailInput">email (para Journey/Triggered Email)</label>
+        <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: usuario@empresa.com" />
       </div>
     </div>
 
@@ -102,17 +102,18 @@
       <button id="btnTestSdk">Testar runtime</button>
     </div>
 
-    <div class="status" id="sdkStatus"></div>
+    <div class="status" id="sdkStatus" aria-live="polite"></div>
 
     <div class="help">
       <b>Fluxo de teste:</b><br/>
       1) Preencha os campos <code>customer_id</code> e <code>email</code>.<br/>
       2) Clique em <b>1) Set Identity</b> para salvar a identidade e enviar o comando <code>identify</code>.<br/>
+      2.1) Se necessário, ajuste <code>IDENTIFY_EMAIL_FIELD</code> no script para o campo de e‑mail esperado pelo seu tenant.<br/>
       3) Clique em <b>3) Disparar Journey</b>: serão definidas as variáveis globais e disparado o evento de mudança de variável.<br/>
       4) A journey configurada no CI360 deve acionar o envio de e‑mail.
     </div>
 
-    <pre id="log"></pre>
+    <pre id="log" aria-live="polite"></pre>
   </div>
 
   <script>
@@ -120,6 +121,7 @@
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
     const sdkStatus = $("sdkStatus");
+    const IDENTIFY_EMAIL_FIELD = "email"; // Ajuste para o campo mapeado no seu tenant (ex.: "email_address")
 
     function log(msg){
       const ts = new Date().toLocaleString();
@@ -133,6 +135,15 @@
 
     function isEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    }
+
+    function buildIdentifyPayload(customerId, email) {
+      const payload = { customer_id: customerId };
+      if (!email) return payload;
+
+      const emailField = (IDENTIFY_EMAIL_FIELD || "email").trim() || "email";
+      payload[emailField] = email;
+      return payload;
     }
 
     // Verifica se o runtime OT2 já substituiu o stub (ou seja, ci360.q indefinido)
@@ -157,6 +168,7 @@
       log(idVal ? `Identity atual: ${idVal}` : "Identity atual: (nenhuma)");
       const emailVal = localStorage.getItem("ci360_email") || "";
       if (emailVal) $("emailInput").value = emailVal;
+      log(`Campo de e-mail usado no identify: ${((IDENTIFY_EMAIL_FIELD || "email").trim() || "email")}`);
     })();
 
     // Checar runtime ao carregar
@@ -183,14 +195,16 @@
       localStorage.setItem("ci360_identity", customerId);
       window.ci360_identity = customerId;
       if (email) localStorage.setItem("ci360_email", email);
+      else localStorage.removeItem("ci360_email");
 
       log(`Identity salva: ${customerId}`);
 
       try {
         await aguardarRuntime(10000);
         // Envia o identify para o runtime
-        window.ci360("identify", { customer_id: customerId });
-        log(`identify enviado: { customer_id: '${customerId}' }`);
+        const identifyPayload = buildIdentifyPayload(customerId, email);
+        window.ci360("identify", identifyPayload);
+        log(`identify enviado: ${JSON.stringify(identifyPayload)}`);
         setStatus("SDK detectado ✅", "ok");
       } catch {
         setStatus("Aguardando runtime...", "warn");
@@ -225,7 +239,7 @@
       try {
         await aguardarRuntime(10000);
         // Reforça a identificação, garantindo que o runtime conheça o customer_id atual
-        window.ci360("identify", { customer_id: customerId });
+        window.ci360("identify", buildIdentifyPayload(customerId, email));
       } catch {
         // se o runtime não estiver ativo, ainda assim criamos as variáveis — elas serão coletadas ao ativar
       }
@@ -242,6 +256,9 @@
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
       window.ci360_identity = "";
+      window.ci360_poc_customer_id = "";
+      window.ci360_poc_email = "";
+      window.ci360_poc_fire = undefined;
       $("identityInput").value = "";
       $("emailInput").value = "";
       log("Dados limpos.");
