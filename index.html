@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CI360 — Teste Web (Click + Identity + Email)</title>
 
-  <!-- Estilos básicos para visualização da PoC -->
   <style>
     body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
     .card { background:#fff; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.08); max-width:820px; padding:24px; }
@@ -29,16 +28,13 @@
       padding:14px; border-radius:12px; height:260px; overflow:auto;
       font-size:12px; white-space:pre-wrap;
     }
-    .pill { display:inline-block; background:#eef2ff; color:#1f2a63; padding:3px 8px; border-radius:999px; font-size:12px; }
     .help { margin-top:14px; font-size:13px; color:#334; line-height:1.35; }
     code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
-  <!-- 1) Variável de identidade para User Identification Definition no CI360
-       Deve existir antes do carregamento da Tag OT2.
-  -->
+  <!-- Identity var precisa existir antes da OT2 -->
   <script>
     (function initIdentityVar(){
       const saved = localStorage.getItem("ci360_identity") || "";
@@ -46,9 +42,7 @@
     })();
   </script>
 
-  <!-- 2) Stub da biblioteca OT2 + tenantId
-       Este código permanece conforme homologado pelo CI360.
-  -->
+  <!-- Stub CI360 + tenantId -->
   <script>
     (function(ci, a) {
       window[ci] || (function() {
@@ -58,11 +52,11 @@
       })();
     })(
       'ci360',
-      { tenantId: '6b615c4d3c00016d3d12ce8f' } // Substitua aqui pelo tenantId real, se necessário.
+      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <-- seu tenantId
     );
   </script>
 
-  <!-- 3) Inclusão da biblioteca OT2 (tag do CI360) -->
+  <!-- OT2 -->
   <script async data-efname="ci360" src="https://i-us.ci360.marketing/js/ot2.min.js" id="ob-script-async"></script>
 
 </head>
@@ -71,17 +65,16 @@
     <h1>CI360 — Teste Web (Click + Identity + Email)</h1>
 
     <p class="muted">
-      Este exemplo demonstra como configurar a PoC de coleta de identidade, disparo de evento customizado e envio de e‑mail na SAS CI360.<br/>
-      Variáveis que serão capturadas:<br/>
-      <code>window.ci360_poc_customer_id</code>, <code>window.ci360_poc_email</code> e <code>window.ci360_poc_fire</code>.<br/>
-      Gatilho do evento: mudança em <code>window.ci360_poc_fire</code> (qualquer valor).<br/>
-      Atributos customizados: <b>customer_id</b> e <b>email_input</b>.
+      Fluxo recomendado no seu tenant (Base_CRM):<br/>
+      <b>customer_id</b> como primário e <b>email_address</b> + <b>email_permission</b> em <code>attributes</code> no <code>identify</code>.<br/>
+      Gatilho: mudança em <code>window.ci360_poc_fire</code>.<br/>
+      Atributos do evento: <b>customer_id</b> e <b>email_input</b>.
     </p>
 
     <div class="grid">
       <div>
         <label for="identityInput">customer_id (Identity)</label>
-        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: teste_01" />
+        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: teste_web_only" />
       </div>
       <div>
         <label for="emailInput">email (para Journey/Triggered Email)</label>
@@ -91,13 +84,8 @@
 
     <div class="row">
       <button class="primary" id="btnSetIdentity">1) Set Identity</button>
-
-      <!-- Click Event: capturado automaticamente pelo OT2 -->
       <button id="btn-ci360-evento-basico">2) Disparar evento (Click)</button>
-
-      <!-- Jornada via mudança de variável JS -->
       <button class="good" id="btnFireJourney">3) Disparar Journey</button>
-
       <button class="danger" id="btnClearIdentity">Limpar</button>
       <button id="btnTestSdk">Testar runtime</button>
     </div>
@@ -106,28 +94,31 @@
 
     <div class="help">
       <b>Fluxo de teste:</b><br/>
-      1) Preencha os campos <code>customer_id</code> e <code>email</code>.<br/>
-      2) Clique em <b>1) Set Identity</b> para salvar a identidade e enviar o comando <code>identify</code>.<br/>
-      2.1) Se necessário, ajuste <code>IDENTIFY_EMAIL_FIELD</code> no script para o campo de e‑mail esperado pelo seu tenant.<br/>
-      3) Clique em <b>3) Disparar Journey</b>: serão definidas as variáveis globais e disparado o evento de mudança de variável.<br/>
-      4) A journey configurada no CI360 deve acionar o envio de e‑mail.
+      1) Preencha <code>customer_id</code> e <code>email</code>.<br/>
+      2) Clique em <b>1) Set Identity</b> (vai enviar <code>identify</code> com <code>attributes.email_address</code> e <code>attributes.email_permission</code>).<br/>
+      3) Clique em <b>3) Disparar Journey</b> (vai disparar o evento por mudança de variável).<br/>
+      4) Valide em Diagnostics: o <code>customer_id</code deve estar associado e o e-mail deve aparecer em “Email Reachability” / perfil.
     </div>
 
     <pre id="log" aria-live="polite"></pre>
   </div>
 
   <script>
-    // Helpers para log e status
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
     const sdkStatus = $("sdkStatus");
-    const IDENTIFY_EMAIL_FIELD = "email"; // Ajuste para o campo mapeado no seu tenant (ex.: "email_address")
+
+    // ✅ De acordo com sua Base_CRM
+    const IDENTIFY_EMAIL_FIELD = "email_address";
+    const IDENTIFY_PERMISSION_FIELD = "email_permission";
+    const DEFAULT_EMAIL_PERMISSION_VALUE = "Y"; // você confirmou que usa Y
 
     function log(msg){
       const ts = new Date().toLocaleString();
       logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
       try { console.log("[CI360-PoC]", msg); } catch {}
     }
+
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
@@ -137,16 +128,7 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    function buildIdentifyPayload(customerId, email) {
-      const payload = { customer_id: customerId };
-      if (!email) return payload;
-
-      const emailField = (IDENTIFY_EMAIL_FIELD || "email").trim() || "email";
-      payload[emailField] = email;
-      return payload;
-    }
-
-    // Verifica se o runtime OT2 já substituiu o stub (ou seja, ci360.q indefinido)
+    // Runtime OK quando o stub foi substituído (ci360.q some)
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -161,17 +143,40 @@
       });
     }
 
-    // Preencher inputs com valores salvos
+    /**
+     * ✅ Identify “correto” para seu cenário:
+     * - customer_id no root (identity primária)
+     * - email_address + email_permission dentro de attributes
+     */
+    function buildIdentifyPayload(customerId, email) {
+      const payload = { customer_id: customerId };
+
+      const attrs = {};
+      if (email) {
+        attrs[IDENTIFY_EMAIL_FIELD] = email;
+        attrs[IDENTIFY_PERMISSION_FIELD] = DEFAULT_EMAIL_PERMISSION_VALUE;
+      }
+
+      if (Object.keys(attrs).length > 0) {
+        payload.attributes = attrs;
+      }
+
+      return payload;
+    }
+
+    // Carrega valores salvos
     (function(){
       const idVal = window.ci360_identity || "";
       $("identityInput").value = idVal;
       log(idVal ? `Identity atual: ${idVal}` : "Identity atual: (nenhuma)");
+
       const emailVal = localStorage.getItem("ci360_email") || "";
       if (emailVal) $("emailInput").value = emailVal;
-      log(`Campo de e-mail usado no identify: ${((IDENTIFY_EMAIL_FIELD || "email").trim() || "email")}`);
+
+      log(`Identify vai usar: attributes.${IDENTIFY_EMAIL_FIELD} + attributes.${IDENTIFY_PERMISSION_FIELD}='${DEFAULT_EMAIL_PERMISSION_VALUE}'`);
     })();
 
-    // Checar runtime ao carregar
+    // Check runtime
     (async () => {
       setStatus("Aguardando runtime do CI360...", "warn");
       try {
@@ -180,7 +185,7 @@
         log("Runtime do CI360 ativo. Pronto para identificar e disparar eventos.");
       } catch {
         setStatus("Runtime não carregou ❌", "warn");
-        log("Runtime não foi detectado no tempo. Verifique tenantId ou bloqueios.");
+        log("Runtime não foi detectado no tempo. Verifique tenantId, consent/cookies, adblock, CSP etc.");
       }
     })();
 
@@ -194,6 +199,7 @@
 
       localStorage.setItem("ci360_identity", customerId);
       window.ci360_identity = customerId;
+
       if (email) localStorage.setItem("ci360_email", email);
       else localStorage.removeItem("ci360_email");
 
@@ -201,9 +207,10 @@
 
       try {
         await aguardarRuntime(10000);
-        // Envia o identify para o runtime
+
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
+
         log(`identify enviado: ${JSON.stringify(identifyPayload)}`);
         setStatus("SDK detectado ✅", "ok");
       } catch {
@@ -212,7 +219,7 @@
       }
     });
 
-    // Botão 2: click tracking
+    // 2) Click tracking
     $("btn-ci360-evento-basico").addEventListener("click", () => {
       log("Click registrado. O OT2 enviará automaticamente um evento /t/s/.");
       alert("Evento de CLICK disparado (tracking automático).");
@@ -227,31 +234,29 @@
       if (!email) { alert("Preencha o email."); return; }
       if (!isEmail(email)) { alert("Email inválido."); return; }
 
-      // Persistência das informações
       localStorage.setItem("ci360_identity", customerId);
       window.ci360_identity = customerId;
       localStorage.setItem("ci360_email", email);
 
-      // Variáveis que o OT2 vai capturar como atributos
+      // Atributos do evento (não do identify)
       window.ci360_poc_customer_id = customerId;
       window.ci360_poc_email       = email;
 
+      // Reforça identify antes de disparar o gatilho
       try {
         await aguardarRuntime(10000);
-        // Reforça a identificação, garantindo que o runtime conheça o customer_id atual
         window.ci360("identify", buildIdentifyPayload(customerId, email));
+        log("identify reforçado antes do trigger.");
       } catch {
-        // se o runtime não estiver ativo, ainda assim criamos as variáveis — elas serão coletadas ao ativar
+        log("Runtime ainda não ativo no reforço do identify (seguindo mesmo assim).");
       }
 
-      // Dispara a variável gatilho: isso acionará o evento Custom Event no CI360
       window.ci360_poc_fire = Date.now();
-
-      log(`Journey trigger enviado: {fire: ${window.ci360_poc_fire}, customer_id: '${customerId}', email: '${email}'}`);
-      alert("Gatilho de Journey enviado. Verifique a entrada na Journey e o envio de e‑mail.");
+      log(`Journey trigger enviado: {fire:${window.ci360_poc_fire}, customer_id:'${customerId}', email:'${email}'}`);
+      alert("Gatilho de Journey enviado. Verifique a Journey/Triggered Email.");
     });
 
-    // Limpar dados
+    // Limpar
     $("btnClearIdentity").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
@@ -262,10 +267,10 @@
       $("identityInput").value = "";
       $("emailInput").value = "";
       log("Dados limpos.");
-      alert("Dados de identity e email removidos. Atualize a página.");
+      alert("Dados removidos. Atualize a página.");
     });
 
-    // Testar runtime manualmente
+    // Testar runtime
     $("btnTestSdk").addEventListener("click", async () => {
       try {
         await aguardarRuntime(8000);
@@ -275,7 +280,7 @@
       } catch {
         setStatus("Runtime não carregou ❌", "warn");
         log("Teste de runtime: falhou.");
-        alert("Runtime não carregou. Verifique tenantId ou bloqueios (consent/adblock)");
+        alert("Runtime não carregou. Verifique tenantId / cookies / adblock / consent.");
       }
     });
   </script>
