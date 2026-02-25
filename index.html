@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CI360 — Teste Web (Identity + Login_ID + Journey)</title>
+  <title>CI360 — Teste Web (Identity + Login_ID + Evento)</title>
 
   <style>
     body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
@@ -15,8 +15,8 @@
     .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
     button { padding:11px 14px; border-radius:10px; border:1px solid #223; background:#fff; cursor:pointer; font-size:14px; }
     button.primary { background:#111827; color:#fff; border-color:#111827; }
-    button.danger { border-color:#b91c1c; color:#b91c1c; }
     button.good { border-color:#0a7a2a; color:#0a7a2a; }
+    button.danger { border-color:#b91c1c; color:#b91c1c; }
     .status { margin-top:12px; font-weight:700; }
     .ok { color:#0a7a2a; }
     .warn { color:#b45309; }
@@ -30,10 +30,11 @@
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
-  <!-- Se você usa User Identification Definition por variável -->
+  <!-- (Opcional) Identity var: se seu tenant usa User Identification por variável -->
   <script>
     (function initIdentityVar(){
-      window.ci360_identity = localStorage.getItem("ci360_identity") || "";
+      const saved = localStorage.getItem("ci360_identity") || "";
+      window.ci360_identity = saved;
     })();
   </script>
 
@@ -45,7 +46,10 @@
         ef.q = [];
         ef.a = a || {};
       })();
-    })('ci360', { tenantId: '6b615c4d3c00016d3d12ce8f' });
+    })(
+      'ci360',
+      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <<< SEU TENANT ID
+    );
   </script>
 
   <!-- OT2 -->
@@ -54,27 +58,28 @@
 
 <body>
   <div class="card">
-    <h1>CI360 — Teste Web (Identity primária + login_id secundária)</h1>
+    <h1>CI360 — Teste Web (Identity primária + login_id)</h1>
 
     <p class="muted">
-      Fluxo: <b>Set Identity</b> → <b>Enviar Jornada</b> (send event no <code>Web PoC Fire</code>).<br/>
-      No Triggered Email, use: <code>To = %%EVENT.TRIGGER.email_input%%</code>
+      <b>Fluxo:</b> 1) Set Identity → 2) Enviar Jornada (evento OT2) → 3) Limpar.<br/>
+      <b>Evento (API key):</b> <code>web_poc_fire</code>.<br/>
+      <b>Identity:</b> <code>customer_id</code> + <code>login_id</code> (email).
     </p>
 
     <div class="grid">
       <div>
         <label for="identityInput">customer_id (Identity primária)</label>
-        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: poc_web_001" />
+        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: poc_web_002" />
       </div>
       <div>
         <label for="emailInput">email (Identity secundária = login_id)</label>
-        <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: renanpascale+ci360poc001@gmail.com" />
+        <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: renanpascale+ci360poc002@gmail.com" />
       </div>
     </div>
 
     <div class="row">
       <button class="primary" id="btnSetIdentity">1) Set Identity</button>
-      <button class="good" id="btnFireJourney">2) Enviar Jornada (Web PoC Fire)</button>
+      <button class="good" id="btnFireEvent">2) Enviar Jornada (web_poc_fire)</button>
       <button class="danger" id="btnClear">Limpar</button>
     </div>
 
@@ -84,12 +89,12 @@
 
   <script>
     // ===== Config =====
-    const IDENTIFY_LOGIN_FIELD   = "login_id";
-    const CONTACT_EMAIL_ATTR     = "email_address";
-    const EMAIL_PERMISSION_ATTR  = "email_permission";
+    const IDENTIFY_LOGIN_FIELD = "login_id";
+    const CONTACT_EMAIL_ATTR   = "email_address";
+    const EMAIL_PERMISSION_ATTR = "email_permission";
 
-    // >>> TEM QUE SER IGUAL AO "API event key" <<<
-    const API_EVENT_KEY          = "Web PoC Fire";
+    // ✅ API event key do seu evento no CI360 (não é o nome bonito)
+    const EVENT_API_KEY = "web_poc_fire";
 
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
@@ -100,17 +105,21 @@
       logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
       try { console.log("[CI360-PoC]", msg); } catch {}
     }
+
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
     }
+
     function isEmail(val) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
+    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
+
     function aguardarRuntime(timeoutMs = 12000) {
       const start = Date.now();
       return new Promise((resolve, reject) => {
@@ -123,6 +132,7 @@
 
     function buildIdentifyPayload(customerId, email) {
       const payload = { customer_id: customerId };
+
       if (email) {
         payload[IDENTIFY_LOGIN_FIELD] = email;
         payload.attributes = {
@@ -130,22 +140,33 @@
           [EMAIL_PERMISSION_ATTR]: "Y"
         };
       }
+
       return payload;
     }
 
-    // Load from storage
-    (function(){
+    // Init (carrega valores salvos + checa runtime)
+    (function init(){
       const idVal = localStorage.getItem("ci360_identity") || "";
       const emailVal = localStorage.getItem("ci360_email") || "";
 
       if (idVal) $("identityInput").value = idVal;
       if (emailVal) $("emailInput").value = emailVal;
 
+      log(idVal ? `Identity atual (customer_id): ${idVal}` : "Identity atual: (nenhuma)");
+      if (emailVal) log(`Email atual (login_id): ${emailVal}`);
+
       setStatus("Aguardando runtime do CI360...", "warn");
 
       aguardarRuntime(12000)
-        .then(() => { setStatus("SDK detectado ✅ (runtime ativo)", "ok"); log("Runtime do CI360 ativo."); })
-        .catch(() => { setStatus("Runtime não carregou ❌", "warn"); log("Runtime não foi detectado no tempo. Verifique bloqueios/consent/rede."); });
+        .then(() => {
+          setStatus("SDK detectado ✅ (runtime ativo)", "ok");
+          log("Runtime do CI360 ativo.");
+          log(`Evento configurado (API key): ${EVENT_API_KEY}`);
+        })
+        .catch(() => {
+          setStatus("Runtime não carregou ❌", "warn");
+          log("Runtime não foi detectado no tempo. Verifique tenantId / consent / adblock / rede.");
+        });
     })();
 
     // 1) Set Identity
@@ -162,8 +183,11 @@
       if (email) localStorage.setItem("ci360_email", email);
       else localStorage.removeItem("ci360_email");
 
+      log(`Salvo: customer_id=${customerId} | email=${email || "(vazio)"}`);
+
       try {
         await aguardarRuntime(10000);
+
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
 
@@ -175,8 +199,8 @@
       }
     });
 
-    // 2) Enviar Jornada (send event)
-    $("btnFireJourney").addEventListener("click", async () => {
+    // 2) Enviar Evento (Journey Trigger) via OT2: ci360("send","event", { event: "api_key", attributes: {...} })
+    $("btnFireEvent").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
       const email      = $("emailInput").value.trim();
 
@@ -191,20 +215,20 @@
       try {
         await aguardarRuntime(10000);
 
-        // Reforça identify antes do evento
+        // reforça identity (boa prática)
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
 
-        // Evento com atributos
-        // IMPORTANTE: email_input deve existir porque você usa no Triggered Email: %%EVENT.TRIGGER.email_input%%
+        // ✅ Evento pelo padrão OT2
         const eventPayload = {
-          name: API_EVENT_KEY,
+          event: EVENT_API_KEY,
           attributes: {
             customer_id: customerId,
             email_input: email,
             email_address: email,
             email_permission: "Y",
+            poc_source: "web",
             ts: Date.now()
           }
         };
@@ -212,10 +236,11 @@
         window.ci360("send", "event", eventPayload);
 
         log(`send event enviado ✅: ${JSON.stringify(eventPayload)}`);
-        alert(`Evento enviado: ${API_EVENT_KEY}. Veja Snowy / Journey / Task.`);
+        alert("Evento enviado. Verifique Snowy (Event Stream) e a Journey/Task.");
+
       } catch {
         setStatus("Runtime não disponível ❌", "warn");
-        log("Falha ao disparar send event: runtime não disponível.");
+        log("Falha ao disparar evento: runtime não disponível.");
         alert("Runtime não carregou. Verifique tenantId/bloqueios.");
       }
     });
@@ -224,14 +249,14 @@
     $("btnClear").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
-      window.ci360_identity = "";
 
+      window.ci360_identity = "";
       $("identityInput").value = "";
       $("emailInput").value = "";
 
-      log("Dados limpos. Faça Ctrl+F5 para teste limpo.");
+      log("Dados limpos. Faça Ctrl+F5 antes do próximo teste.");
       setStatus("Dados limpos ✅", "ok");
-      alert("Dados limpos. Faça Ctrl+F5 antes de testar de novo.");
+      alert("Dados limpos. Faça Ctrl+F5 para um teste bem limpo.");
     });
   </script>
 </body>
