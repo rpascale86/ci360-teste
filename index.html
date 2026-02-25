@@ -22,7 +22,7 @@
     .warn { color:#b45309; }
     pre {
       margin-top:16px; background:#0b1530; color:#dbe7ff;
-      padding:14px; border-radius:12px; height:280px; overflow:auto;
+      padding:14px; border-radius:12px; height:300px; overflow:auto;
       font-size:12px; white-space:pre-wrap;
     }
     code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
@@ -30,7 +30,6 @@
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
-  <!-- (Opcional) preload para performance -->
   <link rel="preload" href="https://i-us.ci360.marketing/js/ot2.min.js" as="script" />
 
   <!-- Identity var (se você usa User Identification Definition por variável) -->
@@ -91,25 +90,25 @@
 
   <script>
     // =========================
-    // CONFIG (SEU CENÁRIO)
+    // CONFIG
     // =========================
     const TENANT_ID = "6b615c4d3c00016d3d12ce8f";
-
-    // ✅ aqui é a API event key do seu "Web PoC Fire 2 1"
     const EVENT_API_KEY = "web_poc_fire";
 
-    // identify: login_id é sua identidade secundária
-    const IDENTIFY_LOGIN_FIELD  = "login_id";
+    // identify: secondary identity field
+    const IDENTIFY_LOGIN_FIELD = "login_id";
 
-    // atributos (mantenha iguais aos nomes que você criou no evento)
-    // obs: email_address é "system defined" e em geral fica Character + PII false (como você viu)
-    const ATTR_CUSTOMER_ID = "customer_id";
-    const ATTR_EMAIL_INPUT = "email_input";
-    const ATTR_EMAIL_ADDR  = "email_address";
+    // event attributes (EXATAMENTE como publicado no evento)
+    const ATTR_CUSTOMER_ID     = "customer_id";
+    const ATTR_EMAIL_INPUT     = "email_input";
+    const ATTR_EMAIL_ADDRESS   = "email_address";
+    const ATTR_EMAIL_PERMISSION= "email_permission";
+    const ATTR_POC_SOURCE      = "poc_source";
+    const ATTR_TS              = "ts";
 
-    // (opcional) atributos padrão do Custom Event (se quiser usar em filtros/organização)
-    const STD_CUSTOM_NAME  = "customName";
-    const STD_GROUP_NAME   = "customGroupName";
+    // valores fixos de PoC
+    const EMAIL_PERMISSION_VALUE = "Y";
+    const POC_SOURCE_VALUE = "web";
 
     // =========================
     // UI helpers
@@ -152,9 +151,10 @@
       const payload = { customer_id: customerId };
       if (email) {
         payload[IDENTIFY_LOGIN_FIELD] = email;
-        // aqui você pode enviar attributes (não depende do Custom Event)
+        // atributos do contato (opcional, mas ajuda)
         payload.attributes = {
-          [ATTR_EMAIL_ADDR]: email
+          [ATTR_EMAIL_ADDRESS]: email,
+          [ATTR_EMAIL_PERMISSION]: EMAIL_PERMISSION_VALUE
         };
       }
       return payload;
@@ -209,6 +209,7 @@
       try {
         await aguardarRuntime(10000);
         const identifyPayload = buildIdentifyPayload(customerId, email);
+
         window.ci360("identify", identifyPayload);
 
         log(`identify enviado ✅: ${JSON.stringify(identifyPayload)}`);
@@ -242,26 +243,24 @@
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
 
-        // ✅ O MAIS IMPORTANTE:
-        // Para Custom Event via JavaScript API, use { event: "<API key>", attributes: {...} }
+        // ✅ Payload correto para Custom Event (JavaScript API):
+        // event = API key (web_poc_fire)
         const eventPayload = {
           event: EVENT_API_KEY,
           attributes: {
-            // (opcional) standard attributes
-            [STD_CUSTOM_NAME]: "poc_ci360_trigger",
-            [STD_GROUP_NAME]: "web_journey",
-
-            // seus atributos do evento
             [ATTR_CUSTOMER_ID]: customerId,
             [ATTR_EMAIL_INPUT]: email,
-            [ATTR_EMAIL_ADDR]: email
+            [ATTR_EMAIL_ADDRESS]: email,
+            [ATTR_EMAIL_PERMISSION]: EMAIL_PERMISSION_VALUE,
+            [ATTR_POC_SOURCE]: POC_SOURCE_VALUE,
+            [ATTR_TS]: Date.now()
           }
         };
 
         window.ci360("send", "event", eventPayload);
 
         log(`send event enviado ✅: ${JSON.stringify(eventPayload)}`);
-        alert(`Evento enviado (${EVENT_API_KEY}). Veja Snowy / Events / Journey.`);
+        alert(`Evento enviado (${EVENT_API_KEY}). Verifique Snowy / Event Stream e Journey.`);
 
       } catch (e) {
         setStatus("Runtime não disponível ❌", "warn");
