@@ -13,18 +13,13 @@
     label { display:block; font-weight:600; margin:14px 0 6px; }
     input { width:100%; padding:12px; border-radius:10px; border:1px solid #ccd; font-size:14px; }
     .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
-    button {
-      padding:11px 14px; border-radius:10px; border:1px solid #223;
-      background:#fff; cursor:pointer; font-size:14px;
-    }
+    button { padding:11px 14px; border-radius:10px; border:1px solid #223; background:#fff; cursor:pointer; font-size:14px; }
     button.primary { background:#111827; color:#fff; border-color:#111827; }
     button.danger { border-color:#b91c1c; color:#b91c1c; }
     button.good { border-color:#0a7a2a; color:#0a7a2a; }
-
     .status { margin-top:12px; font-weight:700; }
     .ok { color:#0a7a2a; }
     .warn { color:#b45309; }
-
     pre {
       margin-top:16px; background:#0b1530; color:#dbe7ff;
       padding:14px; border-radius:12px; height:260px; overflow:auto;
@@ -68,7 +63,7 @@
     <p class="muted">
       <b>Objetivo:</b> replicar o comportamento do MOBILE no WEB:<br/>
       <code>customer_id</code> como identidade primária + <code>login_id</code> (email) como identidade secundária.<br/>
-      <b>Disparo da Journey:</b> via <code>trackEvent</code> no evento <code>Web PoC Fire</code>.
+      <b>Disparo da Journey:</b> via <code>send event</code> no evento <code>Web PoC Fire</code>.
     </p>
 
     <div class="grid">
@@ -98,7 +93,7 @@
     const CONTACT_EMAIL_ATTR     = "email_address";
     const EMAIL_PERMISSION_ATTR  = "email_permission";
 
-    // IMPORTANTE: tem que bater 100% com o nome do evento configurado no CI360
+    // Nome do evento deve bater 100% com o CI360
     const JOURNEY_EVENT_NAME     = "Web PoC Fire";
 
     const $ = (id) => document.getElementById(id);
@@ -120,6 +115,7 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
+    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -190,6 +186,7 @@
       try {
         await aguardarRuntime(10000);
         const identifyPayload = buildIdentifyPayload(customerId, email);
+
         window.ci360("identify", identifyPayload);
 
         log(`identify enviado ✅: ${JSON.stringify(identifyPayload)}`);
@@ -200,7 +197,7 @@
       }
     });
 
-    // 2) Enviar Jornada via trackEvent (Web PoC Fire)
+    // 2) Enviar Jornada via Web Tag (OT2): ci360("send","event", ...)
     $("btnFireJourney").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
       const email      = $("emailInput").value.trim();
@@ -221,28 +218,29 @@
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
 
-        // Dispara o evento que a Journey/Triggered Email está ouvindo
+        // Evento que a Journey/Triggered Email está ouvindo
         const eventPayload = {
           name: JOURNEY_EVENT_NAME,
           attributes: {
             customer_id: customerId,
-            email_input: email,          // útil se você usar %%EVENT.TRIGGER.email_input%%
-            email_address: email,
+            email_input: email,          // para %%EVENT.TRIGGER.email_input%%
+            email_address: email,        // ajuda em merge tags/contato
             email_permission: "Y",
             poc_source: "web",
-            poc_mode: "trackEvent",
+            poc_mode: "send_event",
             ts: Date.now()
           }
         };
 
-        window.ci360("trackEvent", eventPayload);
-        log(`trackEvent enviado ✅: ${JSON.stringify(eventPayload)}`);
+        // ✅ Web Tag OT2
+        window.ci360("send", "event", eventPayload);
 
-        alert("Evento 'Web PoC Fire' enviado. Verifique Journey / Event Stream.");
+        log(`send event enviado ✅: ${JSON.stringify(eventPayload)}`);
+        alert("Evento 'Web PoC Fire' enviado. Verifique Snowy / Journey / Task.");
 
       } catch {
         setStatus("Runtime não disponível ❌", "warn");
-        log("Falha ao disparar trackEvent: runtime não disponível.");
+        log("Falha ao disparar evento: runtime não disponível.");
         alert("Runtime não carregou. Verifique tenantId/bloqueios.");
       }
     });
@@ -256,9 +254,9 @@
       $("identityInput").value = "";
       $("emailInput").value = "";
 
-      log("Dados limpos. Recarregue a página antes de testar novamente.");
+      log("Dados limpos. Recarregue a página (Ctrl+F5) antes de testar novamente.");
       setStatus("Dados limpos ✅", "ok");
-      alert("Dados limpos. Atualize a página (F5) para um teste bem limpo.");
+      alert("Dados limpos. Faça Ctrl+F5 para um teste bem limpo.");
     });
   </script>
 </body>
