@@ -20,15 +20,16 @@
     button.primary { background:#111827; color:#fff; border-color:#111827; }
     button.danger { border-color:#b91c1c; color:#b91c1c; }
     button.good { border-color:#0a7a2a; color:#0a7a2a; }
+
     .status { margin-top:12px; font-weight:700; }
     .ok { color:#0a7a2a; }
     .warn { color:#b45309; }
+
     pre {
       margin-top:16px; background:#0b1530; color:#dbe7ff;
       padding:14px; border-radius:12px; height:260px; overflow:auto;
       font-size:12px; white-space:pre-wrap;
     }
-    .help { margin-top:14px; font-size:13px; color:#334; line-height:1.35; }
     code { background:#f1f5f9; padding:2px 6px; border-radius:6px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
@@ -52,7 +53,7 @@
       })();
     })(
       'ci360',
-      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <<< seu tenantId aqui
+      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <<< seu tenantId
     );
   </script>
 
@@ -67,48 +68,38 @@
     <p class="muted">
       <b>Objetivo:</b> replicar o comportamento do MOBILE no WEB:<br/>
       <code>customer_id</code> como identidade primária + <code>login_id</code> (email) como identidade secundária.<br/>
-      Também enviamos <code>attributes.email_address</code> e <code>attributes.email_permission</code> para Journey/Triggered Email.
+      <b>Disparo da Journey:</b> via <code>trackEvent</code> no evento <code>Web PoC Fire</code>.
     </p>
 
     <div class="grid">
       <div>
         <label for="identityInput">customer_id (Identity primária)</label>
-        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: renan_unificado" />
+        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: poc_web_001" />
       </div>
       <div>
         <label for="emailInput">email (Identity secundária = login_id)</label>
-        <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: usuario@empresa.com" />
+        <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: renanpascale+ci360poc001@gmail.com" />
       </div>
     </div>
 
     <div class="row">
-      <button class="primary" id="btnSetIdentity">1) Set Identity (customer_id + login_id)</button>
-      <button id="btn-ci360-evento-basico">2) Disparar evento (Click)</button>
-      <button class="good" id="btnFireJourney">3) Disparar Journey (Variable Change)</button>
-      <button class="danger" id="btnClearIdentity">Limpar</button>
-      <button id="btnTestSdk">Testar runtime</button>
+      <button class="primary" id="btnSetIdentity">1) Set Identity</button>
+      <button class="good" id="btnFireJourney">2) Enviar Jornada (Web PoC Fire)</button>
+      <button class="danger" id="btnClear">Limpar</button>
     </div>
 
     <div class="status" id="sdkStatus" aria-live="polite"></div>
-
-    <div class="help">
-      <b>Fluxo recomendado:</b><br/>
-      1) Preencha <code>customer_id</code> e <code>email</code>.<br/>
-      2) Clique <b>Set Identity</b> → envia <code>identify</code> com <code>customer_id</code> + <code>login_id</code> (igual ao mobile).<br/>
-      3) Clique <b>Disparar Journey</b> → cria variáveis e dispara o gatilho de variável.<br/>
-      4) Verifique no CI360 Diagnostics / Event Stream e na Journey.
-    </div>
-
     <pre id="log" aria-live="polite"></pre>
   </div>
 
   <script>
-    // ===== Config (igual mobile) =====
-    // No mobile você usa IDENTITY_TYPE_LOGIN para o email.
-    // No web, o equivalente é enviar no identify como login_id.
-    const IDENTIFY_LOGIN_FIELD = "login_id";      // <<< ESSENCIAL
-    const CONTACT_EMAIL_ATTR   = "email_address"; // atributo de contato comum em tenants
-    const EMAIL_PERMISSION_ATTR = "email_permission"; // opcional, mas ajuda muito
+    // ===== Config =====
+    const IDENTIFY_LOGIN_FIELD   = "login_id";
+    const CONTACT_EMAIL_ATTR     = "email_address";
+    const EMAIL_PERMISSION_ATTR  = "email_permission";
+
+    // IMPORTANTE: tem que bater 100% com o nome do evento configurado no CI360
+    const JOURNEY_EVENT_NAME     = "Web PoC Fire";
 
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
@@ -119,6 +110,7 @@
       logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
       try { console.log("[CI360-PoC]", msg); } catch {}
     }
+
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
@@ -128,7 +120,6 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -143,54 +134,47 @@
       });
     }
 
-    // Payload IDENTIFY "igual mobile":
-    // - customer_id (primário)
-    // - login_id (secundário)
-    // - attributes.email_address e attributes.email_permission (para Journey/contato)
     function buildIdentifyPayload(customerId, email) {
       const payload = { customer_id: customerId };
 
       if (email) {
-        payload[IDENTIFY_LOGIN_FIELD] = email; // equivalente ao IDENTITY_TYPE_LOGIN do mobile
+        payload[IDENTIFY_LOGIN_FIELD] = email;
         payload.attributes = {
           [CONTACT_EMAIL_ATTR]: email,
           [EMAIL_PERMISSION_ATTR]: "Y"
         };
       }
-
       return payload;
     }
 
-    // Preencher com storage
+    // Preencher com storage ao abrir
     (function(){
-      const idVal = window.ci360_identity || "";
-      $("identityInput").value = idVal;
-      log(idVal ? `Identity atual (customer_id): ${idVal}` : "Identity atual: (nenhuma)");
-
+      const idVal = localStorage.getItem("ci360_identity") || "";
       const emailVal = localStorage.getItem("ci360_email") || "";
+
+      if (idVal) $("identityInput").value = idVal;
       if (emailVal) $("emailInput").value = emailVal;
 
-      log(`Identify configurado para: customer_id + ${IDENTIFY_LOGIN_FIELD} (email)`);
-      log(`Atributos de contato: attributes.${CONTACT_EMAIL_ATTR} e attributes.${EMAIL_PERMISSION_ATTR}`);
-    })();
+      log(idVal ? `Identity atual (customer_id): ${idVal}` : "Identity atual: (nenhuma)");
+      if (emailVal) log(`Email atual (login_id): ${emailVal}`);
 
-    // Checar runtime
-    (async () => {
       setStatus("Aguardando runtime do CI360...", "warn");
-      try {
-        await aguardarRuntime(12000);
-        setStatus("SDK detectado ✅ (runtime ativo)", "ok");
-        log("Runtime do CI360 ativo. Pronto para identify/eventos.");
-      } catch {
-        setStatus("Runtime não carregou ❌", "warn");
-        log("Runtime não foi detectado no tempo. Verifique tenantId, consent/adblock, rede.");
-      }
+
+      aguardarRuntime(12000)
+        .then(() => {
+          setStatus("SDK detectado ✅ (runtime ativo)", "ok");
+          log("Runtime do CI360 ativo.");
+        })
+        .catch(() => {
+          setStatus("Runtime não carregou ❌", "warn");
+          log("Runtime não foi detectado no tempo. Verifique tenantId/consent/adblock/rede.");
+        });
     })();
 
     // 1) Set Identity
     $("btnSetIdentity").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
-      const email     = $("emailInput").value.trim();
+      const email      = $("emailInput").value.trim();
 
       if (!customerId) { alert("Informe um customer_id."); return; }
       if (email && !isEmail(email)) { alert("Email inválido."); return; }
@@ -205,25 +189,18 @@
 
       try {
         await aguardarRuntime(10000);
-
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
 
         log(`identify enviado ✅: ${JSON.stringify(identifyPayload)}`);
-        setStatus("identify enviado ✅ (customer_id + login_id)", "ok");
-      } catch (e) {
-        setStatus("Aguardando runtime...", "warn");
+        setStatus("identify enviado ✅", "ok");
+      } catch {
+        setStatus("Runtime não disponível ❌", "warn");
         log("Falha ao enviar identify: runtime não disponível.");
       }
     });
 
-    // 2) Click tracking
-    $("btn-ci360-evento-basico").addEventListener("click", () => {
-      log("Click registrado. O OT2 enviará automaticamente um evento /t/s/.");
-      alert("Evento de CLICK disparado (tracking automático).");
-    });
-
-    // 3) Disparar Journey via JS Variable Change
+    // 2) Enviar Jornada via trackEvent (Web PoC Fire)
     $("btnFireJourney").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
       const email      = $("emailInput").value.trim();
@@ -233,60 +210,55 @@
       if (!isEmail(email)) { alert("Email inválido."); return; }
 
       localStorage.setItem("ci360_identity", customerId);
-      window.ci360_identity = customerId;
       localStorage.setItem("ci360_email", email);
-
-      // Vars capturadas pelo OT2 como atributos do evento de variável
-      window.ci360_poc_customer_id = customerId;
-      window.ci360_poc_email       = email;
+      window.ci360_identity = customerId;
 
       try {
         await aguardarRuntime(10000);
 
-        // Reforça identity ANTES do trigger (igual ao fluxo mobile)
+        // Reforça identify antes do evento (boa prática)
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
+
+        // Dispara o evento que a Journey/Triggered Email está ouvindo
+        const eventPayload = {
+          name: JOURNEY_EVENT_NAME,
+          attributes: {
+            customer_id: customerId,
+            email_input: email,          // útil se você usar %%EVENT.TRIGGER.email_input%%
+            email_address: email,
+            email_permission: "Y",
+            poc_source: "web",
+            poc_mode: "trackEvent",
+            ts: Date.now()
+          }
+        };
+
+        window.ci360("trackEvent", eventPayload);
+        log(`trackEvent enviado ✅: ${JSON.stringify(eventPayload)}`);
+
+        alert("Evento 'Web PoC Fire' enviado. Verifique Journey / Event Stream.");
+
       } catch {
-        log("Runtime não disponível no momento do reforço de identify (seguindo mesmo assim).");
+        setStatus("Runtime não disponível ❌", "warn");
+        log("Falha ao disparar trackEvent: runtime não disponível.");
+        alert("Runtime não carregou. Verifique tenantId/bloqueios.");
       }
-
-      // Trigger para Journey (variable change)
-      window.ci360_poc_fire = Date.now();
-
-      log(`Journey trigger enviado ✅: fire=${window.ci360_poc_fire} | customer_id=${customerId} | email=${email} (login_id)`);
-      alert("Gatilho enviado. Verifique a Journey e o Event Stream.");
     });
 
-    // Limpar
-    $("btnClearIdentity").addEventListener("click", () => {
+    // 3) Limpar
+    $("btnClear").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
 
       window.ci360_identity = "";
-      window.ci360_poc_customer_id = "";
-      window.ci360_poc_email = "";
-      window.ci360_poc_fire = undefined;
-
       $("identityInput").value = "";
       $("emailInput").value = "";
 
-      log("Dados limpos.");
-      alert("Dados de identity e email removidos. Atualize a página.");
-    });
-
-    // Test runtime
-    $("btnTestSdk").addEventListener("click", async () => {
-      try {
-        await aguardarRuntime(8000);
-        setStatus("SDK detectado ✅ (runtime ativo)", "ok");
-        log("Teste de runtime: OK");
-        alert("Runtime do CI360 carregado.");
-      } catch {
-        setStatus("Runtime não carregou ❌", "warn");
-        log("Teste de runtime: falhou.");
-        alert("Runtime não carregou. Verifique tenantId, bloqueios e consent.");
-      }
+      log("Dados limpos. Recarregue a página antes de testar novamente.");
+      setStatus("Dados limpos ✅", "ok");
+      alert("Dados limpos. Atualize a página (F5) para um teste bem limpo.");
     });
   </script>
 </body>
