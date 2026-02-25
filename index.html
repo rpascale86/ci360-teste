@@ -30,7 +30,7 @@
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
-  <!-- (Opcional) Identity var: se seu tenant usa User Identification por variável -->
+  <!-- (Opcional) variável de identity (se seu tenant usa User Identification por variável) -->
   <script>
     (function initIdentityVar(){
       const saved = localStorage.getItem("ci360_identity") || "";
@@ -46,10 +46,7 @@
         ef.q = [];
         ef.a = a || {};
       })();
-    })(
-      'ci360',
-      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <<< SEU TENANT ID
-    );
+    })('ci360', { tenantId: '6b615c4d3c00016d3d12ce8f' });
   </script>
 
   <!-- OT2 -->
@@ -61,8 +58,8 @@
     <h1>CI360 — Teste Web (Identity primária + login_id)</h1>
 
     <p class="muted">
-      <b>Fluxo:</b> 1) Set Identity → 2) Enviar Jornada (evento OT2) → 3) Limpar.<br/>
-      <b>Evento (API key):</b> <code>web_poc_fire</code>.<br/>
+      <b>Fluxo:</b> 1) Set Identity → 2) Enviar Evento → 3) Limpar.<br/>
+      <b>Evento (API key):</b> <code>web_poc_fire</code><br/>
       <b>Identity:</b> <code>customer_id</code> + <code>login_id</code> (email).
     </p>
 
@@ -79,7 +76,7 @@
 
     <div class="row">
       <button class="primary" id="btnSetIdentity">1) Set Identity</button>
-      <button class="good" id="btnFireEvent">2) Enviar Jornada (web_poc_fire)</button>
+      <button class="good" id="btnFireEvent">2) Enviar Evento (web_poc_fire)</button>
       <button class="danger" id="btnClear">Limpar</button>
     </div>
 
@@ -88,12 +85,11 @@
   </div>
 
   <script>
-    // ===== Config =====
     const IDENTIFY_LOGIN_FIELD = "login_id";
-    const CONTACT_EMAIL_ATTR   = "email_address";
+    const CONTACT_EMAIL_ATTR = "email_address";
     const EMAIL_PERMISSION_ATTR = "email_permission";
 
-    // ✅ API event key do seu evento no CI360 (não é o nome bonito)
+    // ✅ sua API key
     const EVENT_API_KEY = "web_poc_fire";
 
     const $ = (id) => document.getElementById(id);
@@ -115,7 +111,6 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -132,7 +127,6 @@
 
     function buildIdentifyPayload(customerId, email) {
       const payload = { customer_id: customerId };
-
       if (email) {
         payload[IDENTIFY_LOGIN_FIELD] = email;
         payload.attributes = {
@@ -140,20 +134,15 @@
           [EMAIL_PERMISSION_ATTR]: "Y"
         };
       }
-
       return payload;
     }
 
-    // Init (carrega valores salvos + checa runtime)
     (function init(){
       const idVal = localStorage.getItem("ci360_identity") || "";
       const emailVal = localStorage.getItem("ci360_email") || "";
 
       if (idVal) $("identityInput").value = idVal;
       if (emailVal) $("emailInput").value = emailVal;
-
-      log(idVal ? `Identity atual (customer_id): ${idVal}` : "Identity atual: (nenhuma)");
-      if (emailVal) log(`Email atual (login_id): ${emailVal}`);
 
       setStatus("Aguardando runtime do CI360...", "warn");
 
@@ -169,10 +158,9 @@
         });
     })();
 
-    // 1) Set Identity
     $("btnSetIdentity").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
-      const email      = $("emailInput").value.trim();
+      const email = $("emailInput").value.trim();
 
       if (!customerId) { alert("Informe um customer_id."); return; }
       if (email && !isEmail(email)) { alert("Email inválido."); return; }
@@ -183,11 +171,8 @@
       if (email) localStorage.setItem("ci360_email", email);
       else localStorage.removeItem("ci360_email");
 
-      log(`Salvo: customer_id=${customerId} | email=${email || "(vazio)"}`);
-
       try {
         await aguardarRuntime(10000);
-
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
 
@@ -199,10 +184,9 @@
       }
     });
 
-    // 2) Enviar Evento (Journey Trigger) via OT2: ci360("send","event", { event: "api_key", attributes: {...} })
     $("btnFireEvent").addEventListener("click", async () => {
       const customerId = $("identityInput").value.trim();
-      const email      = $("emailInput").value.trim();
+      const email = $("emailInput").value.trim();
 
       if (!customerId) { alert("Preencha customer_id."); return; }
       if (!email) { alert("Preencha o email."); return; }
@@ -215,27 +199,26 @@
       try {
         await aguardarRuntime(10000);
 
-        // reforça identity (boa prática)
+        // reforça identity
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
 
-        // ✅ Evento pelo padrão OT2
-        const eventPayload = {
+        // ✅ padrão recomendado para JavaScript API Event: event = api key
+        const payload = {
           event: EVENT_API_KEY,
           attributes: {
             customer_id: customerId,
-            email_input: email,
-            email_address: email,
+            email_input: email,     // mantenha Character no CI360
+            email_address: email,   // system-defined (não mexer no tipo no CI360)
             email_permission: "Y",
             poc_source: "web",
             ts: Date.now()
           }
         };
 
-        window.ci360("send", "event", eventPayload);
-
-        log(`send event enviado ✅: ${JSON.stringify(eventPayload)}`);
+        window.ci360("send", "event", payload);
+        log(`send event enviado ✅: ${JSON.stringify(payload)}`);
         alert("Evento enviado. Verifique Snowy (Event Stream) e a Journey/Task.");
 
       } catch {
@@ -245,18 +228,14 @@
       }
     });
 
-    // 3) Limpar
     $("btnClear").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
-
       window.ci360_identity = "";
       $("identityInput").value = "";
       $("emailInput").value = "";
-
       log("Dados limpos. Faça Ctrl+F5 antes do próximo teste.");
       setStatus("Dados limpos ✅", "ok");
-      alert("Dados limpos. Faça Ctrl+F5 para um teste bem limpo.");
     });
   </script>
 </body>
