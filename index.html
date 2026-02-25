@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CI360 — Teste Web (Click + Identity + Email)</title>
+  <title>CI360 — Teste Web (Identity + Login_ID + Journey)</title>
 
   <style>
     body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; padding:32px; }
@@ -34,7 +34,7 @@
     @media (max-width: 720px) { .grid { grid-template-columns:1fr; } }
   </style>
 
-  <!-- Identity var precisa existir antes da OT2 -->
+  <!-- Identity var (se você usa User Identification Definition por variável) -->
   <script>
     (function initIdentityVar(){
       const saved = localStorage.getItem("ci360_identity") || "";
@@ -42,7 +42,7 @@
     })();
   </script>
 
-  <!-- Stub CI360 + tenantId -->
+  <!-- Stub OT2 + tenant -->
   <script>
     (function(ci, a) {
       window[ci] || (function() {
@@ -52,40 +52,39 @@
       })();
     })(
       'ci360',
-      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <-- seu tenantId
+      { tenantId: '6b615c4d3c00016d3d12ce8f' } // <<< seu tenantId aqui
     );
   </script>
 
   <!-- OT2 -->
   <script async data-efname="ci360" src="https://i-us.ci360.marketing/js/ot2.min.js" id="ob-script-async"></script>
-
 </head>
+
 <body>
   <div class="card">
-    <h1>CI360 — Teste Web (Click + Identity + Email)</h1>
+    <h1>CI360 — Teste Web (Identity primária + login_id secundária)</h1>
 
     <p class="muted">
-      Fluxo recomendado no seu tenant (Base_CRM):<br/>
-      <b>customer_id</b> como primário e <b>email_address</b> + <b>email_permission</b> em <code>attributes</code> no <code>identify</code>.<br/>
-      Gatilho: mudança em <code>window.ci360_poc_fire</code>.<br/>
-      Atributos do evento: <b>customer_id</b> e <b>email_input</b>.
+      <b>Objetivo:</b> replicar o comportamento do MOBILE no WEB:<br/>
+      <code>customer_id</code> como identidade primária + <code>login_id</code> (email) como identidade secundária.<br/>
+      Também enviamos <code>attributes.email_address</code> e <code>attributes.email_permission</code> para Journey/Triggered Email.
     </p>
 
     <div class="grid">
       <div>
-        <label for="identityInput">customer_id (Identity)</label>
-        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: teste_web_only" />
+        <label for="identityInput">customer_id (Identity primária)</label>
+        <input id="identityInput" type="text" autocomplete="username" placeholder="ex: renan_unificado" />
       </div>
       <div>
-        <label for="emailInput">email (para Journey/Triggered Email)</label>
+        <label for="emailInput">email (Identity secundária = login_id)</label>
         <input id="emailInput" type="email" inputmode="email" autocomplete="email" placeholder="ex: usuario@empresa.com" />
       </div>
     </div>
 
     <div class="row">
-      <button class="primary" id="btnSetIdentity">1) Set Identity</button>
+      <button class="primary" id="btnSetIdentity">1) Set Identity (customer_id + login_id)</button>
       <button id="btn-ci360-evento-basico">2) Disparar evento (Click)</button>
-      <button class="good" id="btnFireJourney">3) Disparar Journey</button>
+      <button class="good" id="btnFireJourney">3) Disparar Journey (Variable Change)</button>
       <button class="danger" id="btnClearIdentity">Limpar</button>
       <button id="btnTestSdk">Testar runtime</button>
     </div>
@@ -93,32 +92,33 @@
     <div class="status" id="sdkStatus" aria-live="polite"></div>
 
     <div class="help">
-      <b>Fluxo de teste:</b><br/>
+      <b>Fluxo recomendado:</b><br/>
       1) Preencha <code>customer_id</code> e <code>email</code>.<br/>
-      2) Clique em <b>1) Set Identity</b> (vai enviar <code>identify</code> com <code>attributes.email_address</code> e <code>attributes.email_permission</code>).<br/>
-      3) Clique em <b>3) Disparar Journey</b> (vai disparar o evento por mudança de variável).<br/>
-      4) Valide em Diagnostics: o <code>customer_id</code deve estar associado e o e-mail deve aparecer em “Email Reachability” / perfil.
+      2) Clique <b>Set Identity</b> → envia <code>identify</code> com <code>customer_id</code> + <code>login_id</code> (igual ao mobile).<br/>
+      3) Clique <b>Disparar Journey</b> → cria variáveis e dispara o gatilho de variável.<br/>
+      4) Verifique no CI360 Diagnostics / Event Stream e na Journey.
     </div>
 
     <pre id="log" aria-live="polite"></pre>
   </div>
 
   <script>
+    // ===== Config (igual mobile) =====
+    // No mobile você usa IDENTITY_TYPE_LOGIN para o email.
+    // No web, o equivalente é enviar no identify como login_id.
+    const IDENTIFY_LOGIN_FIELD = "login_id";      // <<< ESSENCIAL
+    const CONTACT_EMAIL_ATTR   = "email_address"; // atributo de contato comum em tenants
+    const EMAIL_PERMISSION_ATTR = "email_permission"; // opcional, mas ajuda muito
+
     const $ = (id) => document.getElementById(id);
     const logEl = $("log");
     const sdkStatus = $("sdkStatus");
-
-    // ✅ De acordo com sua Base_CRM
-    const IDENTIFY_EMAIL_FIELD = "email_address";
-    const IDENTIFY_PERMISSION_FIELD = "email_permission";
-    const DEFAULT_EMAIL_PERMISSION_VALUE = "Y"; // você confirmou que usa Y
 
     function log(msg){
       const ts = new Date().toLocaleString();
       logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
       try { console.log("[CI360-PoC]", msg); } catch {}
     }
-
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
@@ -128,7 +128,7 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // Runtime OK quando o stub foi substituído (ci360.q some)
+    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -143,49 +143,47 @@
       });
     }
 
-    /**
-     * ✅ Identify “correto” para seu cenário:
-     * - customer_id no root (identity primária)
-     * - email_address + email_permission dentro de attributes
-     */
+    // Payload IDENTIFY "igual mobile":
+    // - customer_id (primário)
+    // - login_id (secundário)
+    // - attributes.email_address e attributes.email_permission (para Journey/contato)
     function buildIdentifyPayload(customerId, email) {
       const payload = { customer_id: customerId };
 
-      const attrs = {};
       if (email) {
-        attrs[IDENTIFY_EMAIL_FIELD] = email;
-        attrs[IDENTIFY_PERMISSION_FIELD] = DEFAULT_EMAIL_PERMISSION_VALUE;
-      }
-
-      if (Object.keys(attrs).length > 0) {
-        payload.attributes = attrs;
+        payload[IDENTIFY_LOGIN_FIELD] = email; // equivalente ao IDENTITY_TYPE_LOGIN do mobile
+        payload.attributes = {
+          [CONTACT_EMAIL_ATTR]: email,
+          [EMAIL_PERMISSION_ATTR]: "Y"
+        };
       }
 
       return payload;
     }
 
-    // Carrega valores salvos
+    // Preencher com storage
     (function(){
       const idVal = window.ci360_identity || "";
       $("identityInput").value = idVal;
-      log(idVal ? `Identity atual: ${idVal}` : "Identity atual: (nenhuma)");
+      log(idVal ? `Identity atual (customer_id): ${idVal}` : "Identity atual: (nenhuma)");
 
       const emailVal = localStorage.getItem("ci360_email") || "";
       if (emailVal) $("emailInput").value = emailVal;
 
-      log(`Identify vai usar: attributes.${IDENTIFY_EMAIL_FIELD} + attributes.${IDENTIFY_PERMISSION_FIELD}='${DEFAULT_EMAIL_PERMISSION_VALUE}'`);
+      log(`Identify configurado para: customer_id + ${IDENTIFY_LOGIN_FIELD} (email)`);
+      log(`Atributos de contato: attributes.${CONTACT_EMAIL_ATTR} e attributes.${EMAIL_PERMISSION_ATTR}`);
     })();
 
-    // Check runtime
+    // Checar runtime
     (async () => {
       setStatus("Aguardando runtime do CI360...", "warn");
       try {
         await aguardarRuntime(12000);
         setStatus("SDK detectado ✅ (runtime ativo)", "ok");
-        log("Runtime do CI360 ativo. Pronto para identificar e disparar eventos.");
+        log("Runtime do CI360 ativo. Pronto para identify/eventos.");
       } catch {
         setStatus("Runtime não carregou ❌", "warn");
-        log("Runtime não foi detectado no tempo. Verifique tenantId, consent/cookies, adblock, CSP etc.");
+        log("Runtime não foi detectado no tempo. Verifique tenantId, consent/adblock, rede.");
       }
     })();
 
@@ -203,7 +201,7 @@
       if (email) localStorage.setItem("ci360_email", email);
       else localStorage.removeItem("ci360_email");
 
-      log(`Identity salva: ${customerId}`);
+      log(`Salvo: customer_id=${customerId} | email=${email || "(vazio)"}`);
 
       try {
         await aguardarRuntime(10000);
@@ -211,9 +209,9 @@
         const identifyPayload = buildIdentifyPayload(customerId, email);
         window.ci360("identify", identifyPayload);
 
-        log(`identify enviado: ${JSON.stringify(identifyPayload)}`);
-        setStatus("SDK detectado ✅", "ok");
-      } catch {
+        log(`identify enviado ✅: ${JSON.stringify(identifyPayload)}`);
+        setStatus("identify enviado ✅ (customer_id + login_id)", "ok");
+      } catch (e) {
         setStatus("Aguardando runtime...", "warn");
         log("Falha ao enviar identify: runtime não disponível.");
       }
@@ -238,39 +236,46 @@
       window.ci360_identity = customerId;
       localStorage.setItem("ci360_email", email);
 
-      // Atributos do evento (não do identify)
+      // Vars capturadas pelo OT2 como atributos do evento de variável
       window.ci360_poc_customer_id = customerId;
       window.ci360_poc_email       = email;
 
-      // Reforça identify antes de disparar o gatilho
       try {
         await aguardarRuntime(10000);
-        window.ci360("identify", buildIdentifyPayload(customerId, email));
-        log("identify reforçado antes do trigger.");
+
+        // Reforça identity ANTES do trigger (igual ao fluxo mobile)
+        const identifyPayload = buildIdentifyPayload(customerId, email);
+        window.ci360("identify", identifyPayload);
+        log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
       } catch {
-        log("Runtime ainda não ativo no reforço do identify (seguindo mesmo assim).");
+        log("Runtime não disponível no momento do reforço de identify (seguindo mesmo assim).");
       }
 
+      // Trigger para Journey (variable change)
       window.ci360_poc_fire = Date.now();
-      log(`Journey trigger enviado: {fire:${window.ci360_poc_fire}, customer_id:'${customerId}', email:'${email}'}`);
-      alert("Gatilho de Journey enviado. Verifique a Journey/Triggered Email.");
+
+      log(`Journey trigger enviado ✅: fire=${window.ci360_poc_fire} | customer_id=${customerId} | email=${email} (login_id)`);
+      alert("Gatilho enviado. Verifique a Journey e o Event Stream.");
     });
 
     // Limpar
     $("btnClearIdentity").addEventListener("click", () => {
       localStorage.removeItem("ci360_identity");
       localStorage.removeItem("ci360_email");
+
       window.ci360_identity = "";
       window.ci360_poc_customer_id = "";
       window.ci360_poc_email = "";
       window.ci360_poc_fire = undefined;
+
       $("identityInput").value = "";
       $("emailInput").value = "";
+
       log("Dados limpos.");
-      alert("Dados removidos. Atualize a página.");
+      alert("Dados de identity e email removidos. Atualize a página.");
     });
 
-    // Testar runtime
+    // Test runtime
     $("btnTestSdk").addEventListener("click", async () => {
       try {
         await aguardarRuntime(8000);
@@ -280,7 +285,7 @@
       } catch {
         setStatus("Runtime não carregou ❌", "warn");
         log("Teste de runtime: falhou.");
-        alert("Runtime não carregou. Verifique tenantId / cookies / adblock / consent.");
+        alert("Runtime não carregou. Verifique tenantId, bloqueios e consent.");
       }
     });
   </script>
