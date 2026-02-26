@@ -239,11 +239,11 @@
         window.ci360("identify", identifyPayload);
         log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
 
-        // CORREÇÃO 2: Payload correto para Custom Event (JavaScript API)
-        // Utilizar 'eventName' em vez de 'event'
+        // CORREÇÃO: Sintaxe correta para Custom Events na API do SAS CI360
+        // Utiliza-se 'send' passando um objeto com 'event' (ID) e 'data' (Atributos)
         const eventPayload = {
-          eventName: EVENT_API_KEY, 
-          attributes: {
+          event: EVENT_API_KEY, 
+          data: {
             [ATTR_CUSTOMER_ID]: customerId,
             [ATTR_EMAIL_INPUT]: email,
             [ATTR_EMAIL_ADDRESS]: email,
@@ -253,11 +253,11 @@
           }
         };
 
-        // CORREÇÃO 3: Utilizar 'customEvent' na chamada da API
-        window.ci360("customEvent", eventPayload);
+        // Envia o payload utilizando o comando 'send'
+        window.ci360("send", eventPayload);
 
-        log(`customEvent enviado ✅: ${JSON.stringify(eventPayload)}`);
-        alert(`Evento enviado (${EVENT_API_KEY}). Verifique o log de rede e o CI360.`);
+        log(`send disparado ✅: ${JSON.stringify(eventPayload)}`);
+        alert(`Evento enviado (${EVENT_API_KEY}). Verifique a extensão SAS Tag e o CI360.`);
 
       } catch (e) {
         setStatus("Runtime não disponível ❌", "warn");
