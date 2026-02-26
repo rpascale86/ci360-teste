@@ -32,7 +32,7 @@
 
   <link rel="preload" href="https://i-us.ci360.marketing/js/ot2.min.js" as="script" />
 
-  <!-- Variável Identity (se utilizar User Identification Definition por variável) -->
+  <!-- Variável Identity -->
   <script>
     (function initIdentityVar(){
       window.ci360_identity = localStorage.getItem("ci360_identity") || "";
@@ -95,10 +95,8 @@
     const TENANT_ID = "6b615c4d3c00016d3d12ce8f";
     const EVENT_API_KEY = "web_poc_fire";
 
-    // identify: secondary identity field
     const IDENTIFY_LOGIN_FIELD = "login_id";
 
-    // event attributes (EXATAMENTE como publicado no evento)
     const ATTR_CUSTOMER_ID     = "customer_id";
     const ATTR_EMAIL_INPUT     = "email_input";
     const ATTR_EMAIL_ADDRESS   = "email_address";
@@ -106,7 +104,6 @@
     const ATTR_POC_SOURCE      = "poc_source";
     const ATTR_TS              = "ts";
 
-    // valores fixos de PoC
     const EMAIL_PERMISSION_VALUE = "Y";
     const POC_SOURCE_VALUE = "web";
 
@@ -133,7 +130,6 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // Runtime OT2 substitui o stub quando carrega; no stub existe ci360.q
     function runtimeDisponivel() {
       return (typeof window.ci360 === "function" && !window.ci360.q);
     }
@@ -147,7 +143,6 @@
       });
     }
 
-    // CORREÇÃO 1: Remover attributes do identify
     function buildIdentifyPayload(customerId, email) {
       const payload = { customer_id: customerId };
       if (email) {
@@ -227,36 +222,29 @@
       if (!email) { alert("Preencha o email."); return; }
       if (!isEmail(email)) { alert("Email inválido."); return; }
 
-      localStorage.setItem("ci360_identity", customerId);
-      localStorage.setItem("ci360_email", email);
-      window.ci360_identity = customerId;
-
       try {
         await aguardarRuntime(10000);
 
-        // Reforça identify antes do evento
-        const identifyPayload = buildIdentifyPayload(customerId, email);
-        window.ci360("identify", identifyPayload);
-        log(`identify (reforço) enviado ✅: ${JSON.stringify(identifyPayload)}`);
+        // ATENÇÃO: A chamada 'identify' que existia aqui foi removida.
+        // O SDK já a registou no Passo 1. Ao removermos, evitamos "colisões" no envio.
 
-        // CORREÇÃO: Sintaxe correta para Custom Events na API do SAS CI360
-        // Utiliza-se 'send' passando um objeto com 'event' (ID) e 'data' (Atributos)
+        // SINTAXE OFICIAL: 'customEvent' com 'eventName' e 'attributes'.
+        // CORREÇÃO CRÍTICA: Convertendo TODOS os valores para String explícita.
         const eventPayload = {
-          event: EVENT_API_KEY, 
-          data: {
-            [ATTR_CUSTOMER_ID]: customerId,
-            [ATTR_EMAIL_INPUT]: email,
-            [ATTR_EMAIL_ADDRESS]: email,
-            [ATTR_EMAIL_PERMISSION]: EMAIL_PERMISSION_VALUE,
-            [ATTR_POC_SOURCE]: POC_SOURCE_VALUE,
-            [ATTR_TS]: Date.now()
+          eventName: EVENT_API_KEY, 
+          attributes: {
+            [ATTR_CUSTOMER_ID]: String(customerId),
+            [ATTR_EMAIL_INPUT]: String(email),
+            [ATTR_EMAIL_ADDRESS]: String(email),
+            [ATTR_EMAIL_PERMISSION]: String(EMAIL_PERMISSION_VALUE),
+            [ATTR_POC_SOURCE]: String(POC_SOURCE_VALUE),
+            [ATTR_TS]: String(Date.now()) // Era um número, agora é String!
           }
         };
 
-        // Envia o payload utilizando o comando 'send'
-        window.ci360("send", eventPayload);
+        window.ci360("customEvent", eventPayload);
 
-        log(`send disparado ✅: ${JSON.stringify(eventPayload)}`);
+        log(`customEvent disparado ✅: ${JSON.stringify(eventPayload)}`);
         alert(`Evento enviado (${EVENT_API_KEY}). Verifique a extensão SAS Tag e o CI360.`);
 
       } catch (e) {
