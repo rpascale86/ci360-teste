@@ -80,8 +80,9 @@
 
     <div class="row">
       <button class="primary" id="btnSetIdentity">1) Set Identity</button>
-      <button class="good" id="btnSendEvent">2) Enviar Evento (<span id="eventKeyInline"></span>)</button>
+      <button class="good" id="btnSendEvent" data-custom-event="web_poc_fire">2) Enviar Evento (<span id="eventKeyInline"></span>)</button>
       <button class="danger" id="btnClear">Limpar</button>
+      <button id="btnTrace" style="border-color:#6366f1; color:#6366f1;">🔍 Trace / Debug SDK</button>
     </div>
 
     <div class="status" id="sdkStatus" aria-live="polite"></div>
@@ -117,11 +118,19 @@
     $("eventKeyLabel").textContent = EVENT_API_KEY;
     $("eventKeyInline").textContent = EVENT_API_KEY;
 
-    function log(msg){
+    function log(msg, data = null){
       const ts = new Date().toLocaleString();
-      logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
-      try { console.log("[CI360-PoC]", msg); } catch {}
+      let extra = data ? "\n" + JSON.stringify(data, null, 2) : "";
+      logEl.textContent = `[${ts}] ${msg}${extra}\n` + logEl.textContent;
+      try { 
+        if(data) {
+          console.trace("[CI360-PoC Trace]", msg, data); 
+        } else {
+          console.log("[CI360-PoC]", msg);
+        }
+      } catch {}
     }
+    
     function setStatus(text, cls){
       sdkStatus.className = "status " + (cls || "");
       sdkStatus.textContent = text;
@@ -212,9 +221,31 @@
     });
 
     // =========================
-    // 2) Enviar Custom Event (JavaScript API)
+    // SINCRONIZAR ATRIBUTOS HTML (MÉTODO DECLARATIVO)
+    // =========================
+    function syncDataAttributes() {
+      const btn = $("btnSendEvent");
+      const customerId = $("identityInput").value.trim();
+      const email = $("emailInput").value.trim();
+
+      // O SDK do CI360 captura eventos nativamente se o botão tiver 'data-custom-event'
+      btn.setAttribute("data-custom-attribute-customer_id", customerId);
+      btn.setAttribute("data-custom-attribute-email_input", email);
+      btn.setAttribute("data-custom-attribute-email_address", email);
+      btn.setAttribute("data-custom-attribute-email_permission", EMAIL_PERMISSION_VALUE);
+      btn.setAttribute("data-custom-attribute-poc_source", POC_SOURCE_VALUE);
+      // O atributo 'ts' foi removido para evitar falhas de tipagem estrita no SDK.
+    }
+
+    $("identityInput").addEventListener("input", syncDataAttributes);
+    $("emailInput").addEventListener("input", syncDataAttributes);
+
+    // =========================
+    // 2) Enviar Custom Event (JS API + HTML Native Fallback)
     // =========================
     $("btnSendEvent").addEventListener("click", async () => {
+      syncDataAttributes(); // Garante que os dados estão atualizados no HTML
+
       const customerId = $("identityInput").value.trim();
       const email = $("emailInput").value.trim();
 
@@ -225,11 +256,9 @@
       try {
         await aguardarRuntime(10000);
 
-        // ATENÇÃO: A chamada 'identify' que existia aqui foi removida.
-        // O SDK já a registou no Passo 1. Ao removermos, evitamos "colisões" no envio.
-
-        // SINTAXE OFICIAL: 'customEvent' com 'eventName' e 'attributes'.
-        // CORREÇÃO CRÍTICA: Convertendo TODOS os valores para String explícita.
+        // Omitimos o atributo 'ts' (timestamp) do payload.
+        // O CI360 recolhe o timestamp automaticamente. Enviar uma string
+        // num campo que possa estar configurado como numérico rejeita o evento.
         const eventPayload = {
           eventName: EVENT_API_KEY, 
           attributes: {
@@ -237,14 +266,13 @@
             [ATTR_EMAIL_INPUT]: String(email),
             [ATTR_EMAIL_ADDRESS]: String(email),
             [ATTR_EMAIL_PERMISSION]: String(EMAIL_PERMISSION_VALUE),
-            [ATTR_POC_SOURCE]: String(POC_SOURCE_VALUE),
-            [ATTR_TS]: String(Date.now()) // Era um número, agora é String!
+            [ATTR_POC_SOURCE]: String(POC_SOURCE_VALUE)
           }
         };
 
         window.ci360("customEvent", eventPayload);
 
-        log(`customEvent disparado ✅: ${JSON.stringify(eventPayload)}`);
+        log(`customEvent disparado ✅\n(O botão possui 'data-custom-event' para captura nativa)\nPayload: ${JSON.stringify(eventPayload)}`);
         alert(`Evento enviado (${EVENT_API_KEY}). Verifique a extensão SAS Tag e o CI360.`);
 
       } catch (e) {
@@ -268,6 +296,42 @@
       log("Dados limpos. Recarregue a página (Ctrl+F5) para um teste limpo.");
       setStatus("Dados limpos ✅", "ok");
       alert("Dados limpos. Faça Ctrl+F5 para um teste limpo.");
+    });
+
+    // =========================
+    // 4) Trace / Debug SDK
+    // =========================
+    $("btnTrace").addEventListener("click", () => {
+      log("--- INICIANDO TRACE / DEBUG INFO ---");
+      
+      const traceData = {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        localStorage: {
+          ci360_identity: localStorage.getItem("ci360_identity"),
+          ci360_email: localStorage.getItem("ci360_email")
+        },
+        windowVars: {
+          ci360_identity: window.ci360_identity
+        },
+        sdkState: {
+          runtimeDisponivel: runtimeDisponivel(),
+          queueLength: window.ci360 && window.ci360.q ? window.ci360.q.length : 0,
+          isBlockedByAdblocker: !document.getElementById("ob-script-async"),
+          cookiesSAS: document.cookie.includes("ci360") || document.cookie.includes("sas") ? "Presentes" : "Ausentes/Bloqueados"
+        }
+      };
+      
+      log("Estado atual do Sistema e SDK:", traceData);
+      
+      // Força um aviso se existirem eventos presos na fila (queue)
+      if (traceData.sdkState.queueLength > 0) {
+        log(`⚠️ ATENÇÃO: Existem ${traceData.sdkState.queueLength} eventos pendentes na fila do SDK. O SAS CI360 não os enviou para a rede. Verifique bloqueadores de anúncios ou erros de consentimento.`);
+      } else if (!traceData.sdkState.runtimeDisponivel) {
+        log("❌ ERRO CRÍTICO: O motor do SAS CI360 (Runtime) não está a funcionar. Os eventos não vão ser enviados.");
+      } else {
+        log("✅ SDK parece estar saudável e a fila de eventos está limpa (eventos foram processados).");
+      }
     });
   </script>
 </body>
